@@ -50,6 +50,9 @@
  *   GLOBAL FUNCTIONS
  **********************/
 
+// STEP 1: Tell main.c that your custom UI layout file exists
+void init_pocket_reader_ui(void);
+
 #if LV_USE_OS != LV_OS_FREERTOS
 
 int main(int argc, char **argv)
@@ -60,16 +63,11 @@ int main(int argc, char **argv)
   /*Initialize LVGL*/
   lv_init();
 
-  /*Initialize the HAL (display, input devices, tick) for LVGL*/
-  sdl_hal_init(320, 480);
+  /* STEP 2: Change screen bounds from (320, 480) to (240, 320) portrait */
+  sdl_hal_init(240, 320);
 
-  /* Run the default demo */
-  /* To try a different demo or example, replace this with one of: */
-  /* - lv_demo_benchmark(); */
-  /* - lv_demo_stress(); */
-  /* - lv_example_label_1(); */
-  /* - etc. */
-  lv_demo_widgets();
+  /* STEP 3: Delete the old lv_demo_widgets(); demo and launch your menu */
+  init_pocket_reader_ui();
 
   while(1) {
     /* Periodically call the lv_task handler.
@@ -94,4 +92,3 @@ int main(int argc, char **argv)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
-
