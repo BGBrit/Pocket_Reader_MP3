@@ -286,7 +286,10 @@ void draw_ereader_view_page(void) {
 
     // Dynamic Word-Wrapping Text Box Display
     book_text_label = lv_label_create(bg);
-    lv_obj_set_size(book_text_label, 210, 260);
+
+    lv_obj_set_style_text_font(book_text_label, &lv_font_montserrat_14, 0); // Tweaks font to a highly readable, compact size
+
+    lv_obj_set_size(book_text_label, 210, 255);
     lv_label_set_long_mode(book_text_label, LV_LABEL_LONG_WRAP); // Word-wrapper lines
     lv_obj_set_style_text_color(book_text_label, lv_color_make(25, 25, 25), 0);
     lv_obj_align(book_text_label, LV_ALIGN_TOP_MID, 0, 15);
@@ -297,7 +300,7 @@ void draw_ereader_view_page(void) {
     // Clean page metadata tracker footer layout bar
     page_footer_label = lv_label_create(bg);
     lv_obj_set_style_text_color(page_footer_label, lv_color_make(120, 120, 120), 0);
-    lv_obj_align(page_footer_label, LV_ALIGN_BOTTOM_MID, 0, -10);
+    lv_obj_align(page_footer_label, LV_ALIGN_BOTTOM_MID, 0, -2);
 
     char footer_buf[32];
     snprintf(footer_buf, sizeof(footer_buf), "Page %d", ereader_get_current_page_number());

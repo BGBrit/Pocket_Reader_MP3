@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PAGE_SIZE 500 // Max characters to display on a 240x320 portrait screen at once
+#define PAGE_SIZE 450 // Max characters to display on a 240x320 portrait screen at once
 #define MAX_PAGES 1000
 
 static FILE * book_file = NULL;
@@ -40,6 +40,7 @@ void ereader_close_book(void) {
 }
 
 // Reads a clean chunk of text based on our current page position
+// Reads a clean chunk of text and cuts off perfectly at a whole word boundary
 char * ereader_get_page_text(void) {
     if (!book_file) return "Error: No book file loaded.";
 
@@ -50,14 +51,28 @@ char * ereader_get_page_text(void) {
     size_t bytes_read = fread(current_page_buffer, 1, PAGE_SIZE, book_file);
     current_page_buffer[bytes_read] = '\0'; // Clean end to the text string
 
+    // SMART FIX: Scan backward from the end of our buffer to find a clean word break
+    uint32_t characters_that_fit = bytes_read;
+    if (bytes_read == PAGE_SIZE) {
+        // Look for the last space, newline, or punctuation mark within the last 40 characters
+        for (int i = PAGE_SIZE - 1; i > PAGE_SIZE - 40; i--) {
+            if (current_page_buffer[i] == ' ' || current_page_buffer[i] == '\n' || current_page_buffer[i] == '-') {
+                characters_that_fit = i + 1; // Cut off exactly after this word break
+                current_page_buffer[characters_that_fit] = '\0';
+                break;
+            }
+        }
+    }
+
     // If we are opening a brand new page forward, map its start marker for the back button
     if (current_page + 1 > max_pages_visited && current_page + 1 < MAX_PAGES) {
-        page_bookmarks[current_page + 1] = page_bookmarks[current_page] + bytes_read;
+        page_bookmarks[current_page + 1] = page_bookmarks[current_page] + characters_that_fit;
         max_pages_visited++;
     }
 
     return current_page_buffer;
 }
+
 
 // Flips forward one page
 int ereader_next_page(void) {
