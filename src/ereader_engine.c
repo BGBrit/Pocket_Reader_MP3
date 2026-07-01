@@ -38,35 +38,56 @@ void ereader_close_book(void) {
         book_file = NULL;
     }
 }
+// Safely detects UTF-8 smart characters and swaps them into standard ascii tokens
+static int sanitize_character(const char * src, uint32_t read_idx, char * dest, uint32_t * write_idx) {
+    if ((unsigned char)src[read_idx] == 0xE2 && (unsigned char)src[read_idx + 1] == 0x80) {
+        unsigned char third_byte = (unsigned char)src[read_idx + 2];
 
-// Reads a clean chunk of text based on our current page position
-// Reads a clean chunk of text and cuts off perfectly at a whole word boundary
-// Reads a clean chunk of text, strips massive spacing, and cuts off at a whole word
+        if (third_byte == 0x98 || third_byte == 0x99) { // Smart single quote / apostrophe
+            dest[(*write_idx)++] = '\'';
+            return 3; // Consumed 3 raw bytes from the file stream
+        }
+        else if (third_byte == 0x9C || third_byte == 0x9D) { // Curly double quotes
+            dest[(*write_idx)++] = '"';
+            return 3;
+        }
+        else if (third_byte == 0x94) { // Em-dash (—) swap to standard dash
+            dest[(*write_idx)++] = '-';
+            return 3;
+        }
+    }
+    return 0; // Not a special character, zero bytes handled
+}
+
 char * ereader_get_page_text(void) {
     if (!book_file) return "Error: No book file loaded.";
 
     fseek(book_file, page_bookmarks[current_page], SEEK_SET);
 
-    // 1. Read a larger block of text data from the drive to account for paragraph compression changes
     char raw_buffer[PAGE_SIZE * 2];
     size_t bytes_read = fread(raw_buffer, 1, sizeof(raw_buffer) - 1, book_file);
     raw_buffer[bytes_read] = '\0';
 
-    // 2. RUN INTEL INTELLIGENT PARAGRAPH COMPRESSION & LINE-UNWRAPPING
     uint32_t write_idx = 0;
     uint32_t read_idx = 0;
-    uint32_t line_char_count = 0; // Tracks characters since the last intentional break
+    uint32_t line_char_count = 0;
 
     while (raw_buffer[read_idx] != '\0' && write_idx < PAGE_SIZE) {
-        // Strip Windows carriage return carriage flags completely to evaluate a pure \n stream
+
+        // 1. CALL THE REFACTORED SANITIZER METHOD
+        int bytes_sanitized = sanitize_character(raw_buffer, read_idx, current_page_buffer, &write_idx);
+        if (bytes_sanitized > 0) {
+            read_idx += bytes_sanitized;
+            line_char_count++;
+            continue;
+        }
+
         if (raw_buffer[read_idx] == '\r') {
             read_idx++;
             continue;
         }
 
-        // Check if we encountered an active line break marker
         if (raw_buffer[read_idx] == '\n') {
-            // Count how many consecutive newlines follow (checking past hidden \r values)
             int next_idx = read_idx + 1;
             int consecutive_newlines = 1;
             while (raw_buffer[next_idx] == '\n' || raw_buffer[next_idx] == '\r') {
@@ -75,22 +96,17 @@ char * ereader_get_page_text(void) {
             }
 
             if (consecutive_newlines >= 2) {
-                // TRUE PARAGRAPH BOUNDARY DETECTED: Print exactly one empty spacing line
                 current_page_buffer[write_idx++] = '\n';
                 if (write_idx < PAGE_SIZE) current_page_buffer[write_idx++] = '\n';
-                read_idx = next_idx - 1; // Advance the pointer past the spacer blocks
+                read_idx = next_idx - 1;
                 line_char_count = 0;
             }
             else {
-                // SINGLE LINE BREAK ENCOUNTERED (Evaluate context constraints)
-                // If the previous line was short, it's a Table of Contents list or Title header—PRESERVE IT!
                 if (line_char_count < 38) {
                     current_page_buffer[write_idx++] = '\n';
                     line_char_count = 0;
                 }
                 else {
-                    // It is a hard-wrapped middle sentence fragment line—STRIP AND REPLACE WITH SPACE!
-                    // Ensure we don't accidentally print double spaces if one is already present
                     if (write_idx > 0 && current_page_buffer[write_idx - 1] != ' ') {
                         current_page_buffer[write_idx++] = ' ';
                     }
@@ -98,7 +114,6 @@ char * ereader_get_page_text(void) {
             }
         }
         else {
-            // Normal character processing
             current_page_buffer[write_idx++] = raw_buffer[read_idx];
             line_char_count++;
         }
@@ -106,7 +121,6 @@ char * ereader_get_page_text(void) {
     }
     current_page_buffer[write_idx] = '\0';
 
-    // 3. SCAN BACKWARD TO FIND A PERFECT WORD BOUNDARY BREAK
     uint32_t characters_that_fit = write_idx;
     if (write_idx >= PAGE_SIZE - 5) {
         for (int i = write_idx - 1; i > (int)write_idx - 40; i--) {
@@ -124,6 +138,18 @@ char * ereader_get_page_text(void) {
     line_char_count = 0;
 
     while (raw_buffer[actual_file_bytes_used] != '\0' && parsed_bytes_counted < (int)characters_that_fit) {
+
+        // Pass a dummy destination character just to track the bookmark byte offsets safely
+        char dummy_dest;
+        uint32_t dummy_write_idx = 0;
+        int bytes_sanitized = sanitize_character(raw_buffer, actual_file_bytes_used, &dummy_dest, &dummy_write_idx);
+        if (bytes_sanitized > 0) {
+            actual_file_bytes_used += bytes_sanitized;
+            parsed_bytes_counted++;
+            line_char_count++;
+            continue;
+        }
+
         if (raw_buffer[actual_file_bytes_used] == '\r') {
             actual_file_bytes_used++;
             continue;
@@ -143,10 +169,10 @@ char * ereader_get_page_text(void) {
                 line_char_count = 0;
             } else {
                 if (line_char_count < 38) {
-                    parsed_bytes_counted++; // Preserved newline count increment
+                    parsed_bytes_counted++;
                     line_char_count = 0;
                 } else {
-                    parsed_bytes_counted++; // Space placeholder evaluation swap
+                    parsed_bytes_counted++;
                 }
             }
         } else {
@@ -163,6 +189,7 @@ char * ereader_get_page_text(void) {
 
     return current_page_buffer;
 }
+
 
 
 
