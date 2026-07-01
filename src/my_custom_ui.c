@@ -4,15 +4,33 @@
 #include <dirent.h>
 #include <string.h>
 
-#define SDCARD_MOUNT_PATH "/Users/beaubritain/Desktop/fakemicroSD"
-#define BOOKS_DIRECTORY   SDCARD_MOUNT_PATH "/books"
-#define SONGS_DIRECTORY   SDCARD_MOUNT_PATH "/songs"
+// External engine hooks declared inside ereader_engine.c
+int   ereader_open_book(const char * file_path);
+void  ereader_close_book(void);
+char* ereader_get_page_text(void);
+int   ereader_next_page(void);
+int   ereader_prev_page(void);
+int   ereader_get_current_page_number(void);
 
 typedef enum {
     STATE_HOME,
     STATE_BOOKSHELF,
+    STATE_READING_VIEW,  // <-- ADD JUST THIS LINE HERE
     STATE_MP3_LIST
 } AppState;
+
+
+// Layout pointer labels
+static lv_obj_t * book_text_label;
+static lv_obj_t * page_footer_label;
+
+// Forward declaration of the new page screen renderer
+void draw_ereader_view_page(void);
+
+
+#define SDCARD_MOUNT_PATH "/Users/beaubritain/Desktop/fakemicroSD"
+#define BOOKS_DIRECTORY   SDCARD_MOUNT_PATH "/books"
+#define SONGS_DIRECTORY   SDCARD_MOUNT_PATH "/songs"
 
 static AppState current_state = STATE_HOME;
 static lv_group_t * button_group;
@@ -29,33 +47,72 @@ static void clear_screen(void) {
 static void global_navigation_handler(lv_event_t * e) {
     uint32_t key = lv_event_get_key(e);
     lv_obj_t * target = lv_event_get_target(e);
-    int action_id = (intptr_t)lv_obj_get_user_data(target);
 
-    // SPACEBAR OR ENTER -> Confirm Selection
-    if(key == ' ' || key == LV_KEY_ENTER) {
-        clear_screen();
-        if(action_id == 1) { current_state = STATE_BOOKSHELF; draw_bookshelf_page(); }
-        if(action_id == 2) { current_state = STATE_MP3_LIST; draw_songs_page(); }
-        return;
-    }
-
-    // PHYSICAL "B" KEY OR ESCAPE -> Step Backward
+    // BACK ACTION LAYER ("B" Key or Escape)
     if(key == 'b' || key == 'B' || key == LV_KEY_ESC) {
-        if(current_state != STATE_HOME) {
+        if(current_state == STATE_BOOKSHELF || current_state == STATE_MP3_LIST) {
             clear_screen();
             draw_home_page();
+        }
+        else if(current_state == STATE_READING_VIEW) {
+            ereader_close_book(); // Safely unlock your text file pointer stream
+            clear_screen();
+            draw_bookshelf_page(); // Pop back out to the library shelf list
         }
         return;
     }
 
-    // ARROW KEYS -> Menu Selection Traversal
-    if(key == LV_KEY_LEFT || key == LV_KEY_UP) {
-        lv_group_focus_prev(button_group);
+    // LIST AND LAUNCHER TRACKING SCHEME (Menus and App Pickers)
+    if (current_state != STATE_READING_VIEW) {
+        if(key == ' ' || key == LV_KEY_ENTER) {
+            int action_id = (intptr_t)lv_obj_get_user_data(target);
+
+            if(current_state == STATE_HOME) {
+                clear_screen();
+                if(action_id == 1) draw_bookshelf_page();
+                if(action_id == 2) draw_songs_page();
+            }
+            else if(current_state == STATE_BOOKSHELF) {
+                // Pull filename string directly off the highlighted button's child label
+                lv_obj_t * label = lv_obj_get_child(target, 0);
+                const char * filename = lv_label_get_text(label);
+
+                char full_path[512];
+                snprintf(full_path, sizeof(full_path), "%s/%s", BOOKS_DIRECTORY, filename);
+
+                if (ereader_open_book(full_path)) {
+                    clear_screen();
+                    draw_ereader_view_page();
+                }
+            }
+            return;
+        }
+
+        if(key == LV_KEY_LEFT || key == LV_KEY_UP)    lv_group_focus_prev(button_group);
+        if(key == LV_KEY_RIGHT || key == LV_KEY_DOWN) lv_group_focus_next(button_group);
     }
-    if(key == LV_KEY_RIGHT || key == LV_KEY_DOWN) {
-        lv_group_focus_next(button_group);
+
+    // ACTIVE READING CANVAS ENGINE CONTROLS (Page Turning Loops)
+    else if (current_state == STATE_READING_VIEW) {
+        if(key == LV_KEY_RIGHT || key == ' ') { // Right Arrow or Spacebar -> Next Page
+            ereader_next_page();
+            lv_label_set_text(book_text_label, ereader_get_page_text());
+
+            char footer_buf[32];
+            snprintf(footer_buf, sizeof(footer_buf), "Page %d", ereader_get_current_page_number());
+            lv_label_set_text(page_footer_label, footer_buf);
+        }
+        else if(key == LV_KEY_LEFT) { // Left Arrow -> Previous Page
+            ereader_prev_page();
+            lv_label_set_text(book_text_label, ereader_get_page_text());
+
+            char footer_buf[32];
+            snprintf(footer_buf, sizeof(footer_buf), "Page %d", ereader_get_current_page_number());
+            lv_label_set_text(page_footer_label, footer_buf);
+        }
     }
 }
+
 
 void draw_home_page(void) {
     current_state = STATE_HOME;
@@ -208,4 +265,41 @@ void init_pocket_reader_ui(void) {
     // Connect into the default focus engine group created by hal.c
     button_group = lv_group_get_default();
     draw_home_page();
+}
+
+
+void draw_ereader_view_page(void) {
+    current_state = STATE_READING_VIEW;
+
+    // Elegant ivory bone paper background
+    lv_obj_t * bg = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(bg, 240, 320);
+    lv_obj_set_style_bg_color(bg, lv_color_make(250, 248, 245), 0);
+    lv_obj_set_style_radius(bg, 0, 0);
+
+    // Create an invisible focal box so keyboard key presses filter here safely
+    lv_obj_t * key_catcher = lv_obj_create(bg);
+    lv_obj_set_size(key_catcher, 0, 0);
+    lv_obj_add_event_cb(key_catcher, global_navigation_handler, LV_EVENT_KEY, NULL);
+    lv_group_add_obj(button_group, key_catcher);
+    lv_group_focus_obj(key_catcher);
+
+    // Dynamic Word-Wrapping Text Box Display
+    book_text_label = lv_label_create(bg);
+    lv_obj_set_size(book_text_label, 210, 260);
+    lv_label_set_long_mode(book_text_label, LV_LABEL_LONG_WRAP); // Word-wrapper lines
+    lv_obj_set_style_text_color(book_text_label, lv_color_make(25, 25, 25), 0);
+    lv_obj_align(book_text_label, LV_ALIGN_TOP_MID, 0, 15);
+
+    // Initial textbook content extraction pull from our new file engine
+    lv_label_set_text(book_text_label, ereader_get_page_text());
+
+    // Clean page metadata tracker footer layout bar
+    page_footer_label = lv_label_create(bg);
+    lv_obj_set_style_text_color(page_footer_label, lv_color_make(120, 120, 120), 0);
+    lv_obj_align(page_footer_label, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+    char footer_buf[32];
+    snprintf(footer_buf, sizeof(footer_buf), "Page %d", ereader_get_current_page_number());
+    lv_label_set_text(page_footer_label, footer_buf);
 }
