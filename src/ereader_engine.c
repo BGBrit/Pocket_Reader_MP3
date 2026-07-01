@@ -1,36 +1,101 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "ereader_engine.h"
+
+// Define the global variables
+char current_book_path[512] = ""; // Initialize to an empty string
+int current_page = 0;
 
 #define PAGE_SIZE 450 // Max characters to display on a 240x320 portrait screen at once
 #define MAX_PAGES 1000
 
 static FILE * book_file = NULL;
 static long page_bookmarks[MAX_PAGES]; // Holds the exact file character position for every page start
-static int current_page = 0;
 static int max_pages_visited = 0;
 static char current_page_buffer[PAGE_SIZE + 1];
 
-// Opens the chosen book file and resets bookmarks to the beginning
-int ereader_open_book(const char * file_path) {
-    if (book_file) {
-        fclose(book_file);
+void ereader_save_bookmark(const char *file_path) {
+    FILE *bookmark_file = fopen("bookmark.txt", "r+");
+    if (!bookmark_file) {
+        bookmark_file = fopen("bookmark.txt", "w");
     }
 
-    book_file = fopen(file_path, "r");
-    if (!book_file) {
-        return 0; // Error opening file
+    char saved_file_path[256];
+    int saved_page;
+    long pos = 0;
+    int found = 0;
+
+    // Check if the bookmark for this book already exists
+    while (fscanf(bookmark_file, "%s %d", saved_file_path, &saved_page) == 2) {
+        if (strcmp(saved_file_path, file_path) == 0) {
+            found = 1;
+            break;
+        }
+        pos = ftell(bookmark_file);
     }
 
-    // Reset page logs
-    memset(page_bookmarks, 0, sizeof(page_bookmarks));
-    page_bookmarks[0] = 0; // Page 1 starts at character index 0
-    current_page = 0;
-    max_pages_visited = 0;
+    if (found) {
+        // Update the existing bookmark
+        fseek(bookmark_file, pos, SEEK_SET);
+        fprintf(bookmark_file, "%s %d\n", file_path, current_page);
+    } else {
+        // Add a new bookmark
+        fseek(bookmark_file, 0, SEEK_END);
+        fprintf(bookmark_file, "%s %d\n", file_path, current_page);
+    }
 
-    return 1; // Success
+    fclose(bookmark_file);
 }
 
+void ereader_load_bookmark(const char *file_path) {
+    FILE *bookmark_file = fopen("bookmark.txt", "r");
+    if (!bookmark_file) {
+        printf("No bookmarks found.\n");
+        return;
+    }
+
+    char saved_file_path[256];
+    int saved_page;
+
+    // Search for the bookmark for this book
+    while (fscanf(bookmark_file, "%s %d", saved_file_path, &saved_page) == 2) {
+        if (strcmp(saved_file_path, file_path) == 0) {
+            current_page = saved_page;
+            printf("Bookmark loaded for book: %s at page %d\n", file_path, current_page);
+            break;
+        }
+    }
+
+    fclose(bookmark_file);
+}
+int ereader_open_book(const char *file_path) {
+    book_file = fopen(file_path, "r");
+    if (!book_file) {
+        printf("Error: Could not open book file.\n");
+        return 0; // Return 0 to indicate failure
+    }
+
+    // Set the current book path
+    strncpy(current_book_path, file_path, sizeof(current_book_path) - 1);
+    current_book_path[sizeof(current_book_path) - 1] = '\0'; // Ensure null termination
+
+    // Load bookmark for this book
+    ereader_load_bookmark(file_path);
+
+    // Seek to the correct position in the file based on the bookmark
+    if (current_page > 0 && current_page < MAX_PAGES) {
+        fseek(book_file, page_bookmarks[current_page], SEEK_SET);
+    } else {
+        current_page = 0; // Default to the first page if no valid bookmark exists
+    }
+
+    max_pages_visited = current_page;
+    memset(current_page_buffer, 0, sizeof(current_page_buffer));
+
+    printf("Book opened: %s at page %d\n", file_path, current_page);
+    return 1; // Return 1 to indicate success
+}
 // Closes the file safely when backing out to the shelf menu
 void ereader_close_book(void) {
     if (book_file) {

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <string.h>
+#include "ereader_engine.h"
 
 // External engine hooks declared inside ereader_engine.c
 int   ereader_open_book(const char * file_path);
@@ -94,7 +95,7 @@ static void global_navigation_handler(lv_event_t * e) {
 
     // ACTIVE READING CANVAS ENGINE CONTROLS (Page Turning Loops)
     else if (current_state == STATE_READING_VIEW) {
-        if(key == LV_KEY_RIGHT || key == ' ') { // Right Arrow or Spacebar -> Next Page
+        if (key == LV_KEY_RIGHT) { // Right Arrow -> Next Page
             ereader_next_page();
             lv_label_set_text(book_text_label, ereader_get_page_text());
 
@@ -102,13 +103,12 @@ static void global_navigation_handler(lv_event_t * e) {
             snprintf(footer_buf, sizeof(footer_buf), "Page %d", ereader_get_current_page_number());
             lv_label_set_text(page_footer_label, footer_buf);
         }
-        else if(key == LV_KEY_LEFT) { // Left Arrow -> Previous Page
-            ereader_prev_page();
-            lv_label_set_text(book_text_label, ereader_get_page_text());
+        else if (key == ' ') { // Spacebar -> Save Bookmark
+            ereader_save_bookmark(current_book_path); // Save the bookmark for the current book
+            printf("Bookmark saved for book: %s at page %d\n", current_book_path, current_page);
 
-            char footer_buf[32];
-            snprintf(footer_buf, sizeof(footer_buf), "Page %d", ereader_get_current_page_number());
-            lv_label_set_text(page_footer_label, footer_buf);
+            // Optional: Provide visual feedback to the user
+            lv_label_set_text(page_footer_label, "Bookmark Saved!");
         }
     }
 }
