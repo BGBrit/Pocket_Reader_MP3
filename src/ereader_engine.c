@@ -41,37 +41,130 @@ void ereader_close_book(void) {
 
 // Reads a clean chunk of text based on our current page position
 // Reads a clean chunk of text and cuts off perfectly at a whole word boundary
+// Reads a clean chunk of text, strips massive spacing, and cuts off at a whole word
 char * ereader_get_page_text(void) {
     if (!book_file) return "Error: No book file loaded.";
 
-    // Jump straight to the bookmark position saved for this specific page index
     fseek(book_file, page_bookmarks[current_page], SEEK_SET);
 
-    // Read a raw block of letters from your computer's hard drive text stream
-    size_t bytes_read = fread(current_page_buffer, 1, PAGE_SIZE, book_file);
-    current_page_buffer[bytes_read] = '\0'; // Clean end to the text string
+    // 1. Read a larger block of text data from the drive to account for paragraph compression changes
+    char raw_buffer[PAGE_SIZE * 2];
+    size_t bytes_read = fread(raw_buffer, 1, sizeof(raw_buffer) - 1, book_file);
+    raw_buffer[bytes_read] = '\0';
 
-    // SMART FIX: Scan backward from the end of our buffer to find a clean word break
-    uint32_t characters_that_fit = bytes_read;
-    if (bytes_read == PAGE_SIZE) {
-        // Look for the last space, newline, or punctuation mark within the last 40 characters
-        for (int i = PAGE_SIZE - 1; i > PAGE_SIZE - 40; i--) {
-            if (current_page_buffer[i] == ' ' || current_page_buffer[i] == '\n' || current_page_buffer[i] == '-') {
-                characters_that_fit = i + 1; // Cut off exactly after this word break
+    // 2. RUN INTEL INTELLIGENT PARAGRAPH COMPRESSION & LINE-UNWRAPPING
+    uint32_t write_idx = 0;
+    uint32_t read_idx = 0;
+    uint32_t line_char_count = 0; // Tracks characters since the last intentional break
+
+    while (raw_buffer[read_idx] != '\0' && write_idx < PAGE_SIZE) {
+        // Strip Windows carriage return carriage flags completely to evaluate a pure \n stream
+        if (raw_buffer[read_idx] == '\r') {
+            read_idx++;
+            continue;
+        }
+
+        // Check if we encountered an active line break marker
+        if (raw_buffer[read_idx] == '\n') {
+            // Count how many consecutive newlines follow (checking past hidden \r values)
+            int next_idx = read_idx + 1;
+            int consecutive_newlines = 1;
+            while (raw_buffer[next_idx] == '\n' || raw_buffer[next_idx] == '\r') {
+                if (raw_buffer[next_idx] == '\n') consecutive_newlines++;
+                next_idx++;
+            }
+
+            if (consecutive_newlines >= 2) {
+                // TRUE PARAGRAPH BOUNDARY DETECTED: Print exactly one empty spacing line
+                current_page_buffer[write_idx++] = '\n';
+                if (write_idx < PAGE_SIZE) current_page_buffer[write_idx++] = '\n';
+                read_idx = next_idx - 1; // Advance the pointer past the spacer blocks
+                line_char_count = 0;
+            }
+            else {
+                // SINGLE LINE BREAK ENCOUNTERED (Evaluate context constraints)
+                // If the previous line was short, it's a Table of Contents list or Title header—PRESERVE IT!
+                if (line_char_count < 38) {
+                    current_page_buffer[write_idx++] = '\n';
+                    line_char_count = 0;
+                }
+                else {
+                    // It is a hard-wrapped middle sentence fragment line—STRIP AND REPLACE WITH SPACE!
+                    // Ensure we don't accidentally print double spaces if one is already present
+                    if (write_idx > 0 && current_page_buffer[write_idx - 1] != ' ') {
+                        current_page_buffer[write_idx++] = ' ';
+                    }
+                }
+            }
+        }
+        else {
+            // Normal character processing
+            current_page_buffer[write_idx++] = raw_buffer[read_idx];
+            line_char_count++;
+        }
+        read_idx++;
+    }
+    current_page_buffer[write_idx] = '\0';
+
+    // 3. SCAN BACKWARD TO FIND A PERFECT WORD BOUNDARY BREAK
+    uint32_t characters_that_fit = write_idx;
+    if (write_idx >= PAGE_SIZE - 5) {
+        for (int i = write_idx - 1; i > (int)write_idx - 40; i--) {
+            if (current_page_buffer[i] == ' ' || current_page_buffer[i] == '\n') {
+                characters_that_fit = i + 1;
                 current_page_buffer[characters_that_fit] = '\0';
                 break;
             }
         }
     }
 
-    // If we are opening a brand new page forward, map its start marker for the back button
+    // 4. MAP THE DIGITAL PAGE BOOKMARK OFFSET VALUE ACCURATELY TO THE REAL FILE SEEK POSITION
+    int actual_file_bytes_used = 0;
+    int parsed_bytes_counted = 0;
+    line_char_count = 0;
+
+    while (raw_buffer[actual_file_bytes_used] != '\0' && parsed_bytes_counted < (int)characters_that_fit) {
+        if (raw_buffer[actual_file_bytes_used] == '\r') {
+            actual_file_bytes_used++;
+            continue;
+        }
+
+        if (raw_buffer[actual_file_bytes_used] == '\n') {
+            int next_idx = actual_file_bytes_used + 1;
+            int consecutive_newlines = 1;
+            while (raw_buffer[next_idx] == '\n' || raw_buffer[next_idx] == '\r') {
+                if (raw_buffer[next_idx] == '\n') consecutive_newlines++;
+                next_idx++;
+            }
+
+            if (consecutive_newlines >= 2) {
+                parsed_bytes_counted += 2;
+                actual_file_bytes_used = next_idx - 1;
+                line_char_count = 0;
+            } else {
+                if (line_char_count < 38) {
+                    parsed_bytes_counted++; // Preserved newline count increment
+                    line_char_count = 0;
+                } else {
+                    parsed_bytes_counted++; // Space placeholder evaluation swap
+                }
+            }
+        } else {
+            parsed_bytes_counted++;
+            line_char_count++;
+        }
+        actual_file_bytes_used++;
+    }
+
     if (current_page + 1 > max_pages_visited && current_page + 1 < MAX_PAGES) {
-        page_bookmarks[current_page + 1] = page_bookmarks[current_page] + characters_that_fit;
+        page_bookmarks[current_page + 1] = page_bookmarks[current_page] + actual_file_bytes_used;
         max_pages_visited++;
     }
 
     return current_page_buffer;
 }
+
+
 
 
 // Flips forward one page
