@@ -78,11 +78,12 @@ static void handle_newline(const char *raw_buffer,
     }
 }
 
-static size_t build_page(char *raw_buffer) {
+static size_t build_page(char *raw_buffer, size_t *bytes_used_out) {
 
     uint32_t write_idx = 0;
     uint32_t read_idx = 0;
     uint32_t line_char_count = 0;
+    uint32_t file_bytes_used = 0;
 
     while (raw_buffer[read_idx] != '\0' && write_idx < PAGE_SIZE) {
 
@@ -91,6 +92,7 @@ static size_t build_page(char *raw_buffer) {
 
         if (consumed > 0) {
             read_idx += consumed;
+            file_bytes_used += consumed;
             line_char_count++;
             continue;
         }
@@ -105,15 +107,18 @@ static size_t build_page(char *raw_buffer) {
                            current_page_buffer,
                            &write_idx,
                            &line_char_count);
+            file_bytes_used++;
             read_idx++;
             continue;
         }
 
         current_page_buffer[write_idx++] = raw_buffer[read_idx++];
+        file_bytes_used++;
         line_char_count++;
     }
 
     current_page_buffer[write_idx] = '\0';
+    *bytes_used_out = file_bytes_used;
     return write_idx;
 }
 
@@ -134,77 +139,6 @@ static size_t trim_page(size_t used) {
     }
 
     return cutoff;
-}
-
-static void update_bookmark_tracking(char *raw_buffer, size_t cutoff) {
-
-    int actual_file_bytes_used = 0;
-    int parsed_bytes_counted = 0;
-    int line_char_count = 0;
-
-    while (raw_buffer[actual_file_bytes_used] != '\0'
-           && parsed_bytes_counted < (int)cutoff) {
-
-        char dummy_dest;
-        uint32_t dummy_write_idx = 0;
-
-        int consumed = sanitize_character(
-            raw_buffer,
-            actual_file_bytes_used,
-            &dummy_dest,
-            &dummy_write_idx);
-
-        if (consumed > 0) {
-            actual_file_bytes_used += consumed;
-            parsed_bytes_counted++;
-            line_char_count++;
-            continue;
-        }
-
-        if (raw_buffer[actual_file_bytes_used] == '\r') {
-            actual_file_bytes_used++;
-            continue;
-        }
-
-        if (raw_buffer[actual_file_bytes_used] == '\n') {
-            int next_idx = actual_file_bytes_used + 1;
-            int consecutive_newlines = 1;
-
-            while (raw_buffer[next_idx] == '\n' ||
-                   raw_buffer[next_idx] == '\r') {
-                if (raw_buffer[next_idx] == '\n')
-                    consecutive_newlines++;
-                next_idx++;
-            }
-
-            if (consecutive_newlines >= 2) {
-                parsed_bytes_counted += 2;
-                actual_file_bytes_used = next_idx - 1;
-                line_char_count = 0;
-            } else {
-                if (line_char_count < 38) {
-                    parsed_bytes_counted++;
-                    line_char_count = 0;
-                } else {
-                    parsed_bytes_counted++;
-                }
-            }
-        } else {
-            parsed_bytes_counted++;
-            line_char_count++;
-        }
-
-        actual_file_bytes_used++;
-    }
-
-    if (current_page + 1 > max_pages_visited &&
-        current_page + 1 < MAX_PAGES) {
-
-        page_bookmarks[current_page + 1] =
-            page_bookmarks[current_page] + actual_file_bytes_used;
-
-        max_pages_visited++;
-    }
 }
 
 static FILE *open_bookmark_file_rw(void) {
@@ -329,10 +263,19 @@ char *ereader_get_page_text(void) {
     char raw_buffer[PAGE_SIZE * 2];
     read_raw_block(raw_buffer);
 
-    size_t used = build_page(raw_buffer);
+    size_t bytes_used = 0;
+
+    size_t used = build_page(raw_buffer, &bytes_used);
     size_t cutoff = trim_page(used);
 
-    update_bookmark_tracking(raw_buffer, cutoff);
+    if (current_page + 1 > max_pages_visited &&
+        current_page + 1 < MAX_PAGES)
+    {
+        page_bookmarks[current_page + 1] =
+            page_bookmarks[current_page] + bytes_used;
+
+        max_pages_visited++;
+    }
 
     return current_page_buffer;
 }
