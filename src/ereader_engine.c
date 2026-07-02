@@ -24,24 +24,39 @@ static size_t read_raw_block(char *raw_buffer) {
 static int sanitize_character(const char *src, uint32_t i,
                               char *dest, uint32_t *widx)
 {
-    if ((unsigned char)src[i] == 0xE2 &&
-        (unsigned char)src[i + 1] == 0x80)
-    {
-        unsigned char t = (unsigned char)src[i + 2];
+    // HARD SAFETY CHECK: prevent buffer over-read
+    if (!src)
+        return 0;
 
-        if (t == 0x98 || t == 0x99) {
-            dest[(*widx)++] = '\'';
-            return 3;
-        }
-        if (t == 0x9C || t == 0x9D) {
-            dest[(*widx)++] = '"';
-            return 3;
-        }
-        if (t == 0x94) {
-            dest[(*widx)++] = '-';
-            return 3;
-        }
+    if (src[i] == '\0')
+        return 0;
+
+    // ensure we can safely read i+2
+    if ((unsigned char)src[i] != 0xE2)
+        return 0;
+
+    // guard next bytes BEFORE accessing them
+    unsigned char b1 = (unsigned char)src[i + 1];
+    unsigned char b2 = (unsigned char)src[i + 2];
+
+    if (b1 != 0x80)
+        return 0;
+
+    if (b2 == 0x98 || b2 == 0x99) {
+        dest[(*widx)++] = '\'';
+        return 3;
     }
+
+    if (b2 == 0x9C || b2 == 0x9D) {
+        dest[(*widx)++] = '"';
+        return 3;
+    }
+
+    if (b2 == 0x94) {
+        dest[(*widx)++] = '-';
+        return 3;
+    }
+
     return 0;
 }
 
@@ -122,25 +137,6 @@ static size_t build_page(char *raw_buffer, size_t *bytes_used_out) {
     return write_idx;
 }
 
-static size_t trim_page(size_t used) {
-
-    size_t cutoff = used;
-
-    if (used >= PAGE_SIZE - 5) {
-        for (int i = used - 1; i > (int)used - 40; i--) {
-            if (current_page_buffer[i] == ' ' ||
-                current_page_buffer[i] == '\n') {
-
-                cutoff = i + 1;
-                current_page_buffer[cutoff] = '\0';
-                break;
-            }
-        }
-    }
-
-    return cutoff;
-}
-
 static FILE *open_bookmark_file_rw(void) {
     FILE *f = fopen("bookmark.txt", "r+");
     if (!f) f = fopen("bookmark.txt", "w");
@@ -154,6 +150,10 @@ static FILE *open_bookmark_file_r(void) {
 static void seek_to_current_page(void)
 {
     if (!book_file) return;
+
+    if (page_bookmarks[current_page] == 0 && current_page != 0)
+        return; // prevents fake seek
+
     fseek(book_file, page_bookmarks[current_page], SEEK_SET);
 }
 
@@ -225,6 +225,8 @@ static void reset_reader_state_after_open(void) {
 
 int ereader_open_book(const char *file_path)
 {
+    page_bookmarks[0] = 0;
+    max_pages_visited = 0;
     book_file = open_book_file(file_path);
 
     if (!book_file) {
@@ -258,6 +260,10 @@ char *ereader_get_page_text(void) {
     if (!book_file)
         return "Error: No book file loaded.";
 
+    printf("PAGE=%d OFFSET=%ld\n",
+       current_page,
+       page_bookmarks[current_page]);
+
     seek_to_current_page();
 
     char raw_buffer[PAGE_SIZE * 2];
@@ -266,7 +272,7 @@ char *ereader_get_page_text(void) {
     size_t bytes_used = 0;
 
     size_t used = build_page(raw_buffer, &bytes_used);
-    size_t cutoff = trim_page(used);
+    size_t cutoff = used;
 
     if (current_page + 1 > max_pages_visited &&
         current_page + 1 < MAX_PAGES)
@@ -282,16 +288,14 @@ char *ereader_get_page_text(void) {
 
 
 // Flips forward one page
-int ereader_next_page(void) {
+int ereader_next_page(void)
+{
     if (!book_file) return current_page + 1;
 
-    // Check if there is still unread text left in the file archive
-    fseek(book_file, 0, SEEK_END);
-    long end_of_file = ftell(book_file);
+    if (page_bookmarks[current_page + 1] == 0)
+        return current_page + 1; // cannot move yet
 
-    if (page_bookmarks[current_page + 1] < end_of_file && page_bookmarks[current_page + 1] != 0) {
-        current_page++;
-    }
+    current_page++;
     return current_page + 1;
 }
 

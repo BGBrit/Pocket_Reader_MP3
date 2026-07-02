@@ -103,6 +103,17 @@ static void global_navigation_handler(lv_event_t * e) {
             snprintf(footer_buf, sizeof(footer_buf), "Page %d", ereader_get_current_page_number());
             lv_label_set_text(page_footer_label, footer_buf);
         }
+        else if (key == LV_KEY_LEFT) { // Left Arrow -> Previous Page
+            ereader_prev_page();
+
+            lv_label_set_text(book_text_label, ereader_get_page_text());
+
+            char footer_buf[32];
+            snprintf(footer_buf, sizeof(footer_buf),
+                    "Page %d", ereader_get_current_page_number());
+
+            lv_label_set_text(page_footer_label, footer_buf);
+        }
         else if (key == ' ') { // Spacebar -> Save Bookmark
             ereader_save_bookmark(current_book_path); // Save the bookmark for the current book
             printf("Bookmark saved for book: %s at page %d\n", current_book_path, current_page);
