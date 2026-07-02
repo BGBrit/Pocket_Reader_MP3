@@ -217,7 +217,11 @@ static FILE *open_bookmark_file_r(void) {
     return fopen("bookmark.txt", "r");
 }
 
-
+static void seek_to_current_page(void)
+{
+    if (!book_file) return;
+    fseek(book_file, page_bookmarks[current_page], SEEK_SET);
+}
 
 void ereader_save_bookmark(const char *file_path) {
     FILE *bookmark_file = open_bookmark_file_rw();
@@ -285,20 +289,6 @@ static void reset_reader_state_after_open(void) {
     memset(current_page_buffer, 0, sizeof(current_page_buffer));
 }
 
-static void restore_book_position(void)
-{
-    if (current_page > 0 && current_page < MAX_PAGES) {
-        fseek(book_file, page_bookmarks[current_page], SEEK_SET);
-    } else {
-        current_page = 0;
-    }
-}
-
-static void initialize_reader_state(void)
-{
-    max_pages_visited = current_page;
-    memset(current_page_buffer, 0, sizeof(current_page_buffer));
-}
 int ereader_open_book(const char *file_path)
 {
     book_file = open_book_file(file_path);
@@ -312,8 +302,9 @@ int ereader_open_book(const char *file_path)
 
     ereader_load_bookmark(file_path);
 
-    restore_book_position();
-    initialize_reader_state();
+    // ONLY runtime reset (single source of truth)
+    max_pages_visited = current_page;
+    memset(current_page_buffer, 0, sizeof(current_page_buffer));
 
     printf("Book opened: %s at page %d\n", file_path, current_page);
 
@@ -328,31 +319,15 @@ void ereader_close_book(void) {
     }
 }
 
-
-static size_t read_raw_block_at_current_page(char *raw_buffer)
-{
-    if (!book_file)
-        return 0;
-
-    fseek(book_file, page_bookmarks[current_page], SEEK_SET);
-
-    size_t bytes_read =
-        fread(raw_buffer, 1, (PAGE_SIZE * 2) - 1, book_file);
-
-    raw_buffer[bytes_read] = '\0';
-
-    return bytes_read;
-}
-
 char *ereader_get_page_text(void) {
 
     if (!book_file)
         return "Error: No book file loaded.";
 
-    fseek(book_file, page_bookmarks[current_page], SEEK_SET);
+    seek_to_current_page();
 
     char raw_buffer[PAGE_SIZE * 2];
-    read_raw_block_at_current_page(raw_buffer);
+    read_raw_block(raw_buffer);
 
     size_t used = build_page(raw_buffer);
     size_t cutoff = trim_page(used);
