@@ -223,6 +223,16 @@ static void reset_reader_state_after_open(void) {
     memset(current_page_buffer, 0, sizeof(current_page_buffer));
 }
 
+static void seek_to_page_number(int target_page)
+{
+    current_page = 0;
+
+    for (int i = 0; i < target_page; i++) {
+        ereader_get_page_text(); // advances bookmarks internally
+        current_page++;
+    }
+}
+
 int ereader_open_book(const char *file_path)
 {
     page_bookmarks[0] = 0;
@@ -239,10 +249,7 @@ int ereader_open_book(const char *file_path)
     ereader_load_bookmark(file_path);
 
     if (current_page > 0) {
-        fseek(book_file, 0, SEEK_SET);
-
-        // rebuild initial bookmark baseline safely
-        page_bookmarks[0] = 0;
+        seek_to_page_number(current_page);
     }
 
     // ONLY runtime reset (single source of truth)
@@ -318,29 +325,18 @@ int ereader_prev_page(void) {
 int ereader_get_current_page_number(void) {
     return current_page + 1;
 }
-
 int ereader_get_progress_percent(void)
 {
     if (!book_file)
         return 0;
 
-    // go to end of file to measure total size
+    long current_pos = page_bookmarks[current_page];
+
     fseek(book_file, 0, SEEK_END);
     long file_size = ftell(book_file);
 
     if (file_size <= 0)
         return 0;
 
-    // current position in file (based on your pagination system)
-    long offset = page_bookmarks[current_page];
-
-    // avoid divide-by-zero + compute percentage
-    double percent = ((double)offset / (double)file_size) * 100.0;
-
-    int result = (int)(percent + 0.5); // round to nearest int
-
-    if (result < 0) result = 0;
-    if (result > 100) result = 100;
-
-    return result;
+    return (int)((current_pos * 100) / file_size);
 }
