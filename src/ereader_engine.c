@@ -304,24 +304,44 @@ char *ereader_get_page_text(void) {
     return current_page_buffer;
 }
 
+static int can_go_next_page(void)
+{
+    if (!book_file)
+        return 0;
 
-// Flips forward one page
+    long current_pos = page_bookmarks[current_page];
+
+    // get file size
+    fseek(book_file, 0, SEEK_END);
+    long file_size = ftell(book_file);
+
+    // restore position (IMPORTANT)
+    fseek(book_file, current_pos, SEEK_SET);
+
+    // allow next page only if we are not at end
+    return current_pos < file_size;
+}
+
+static int can_go_prev_page(void)
+{
+    return current_page > 0;
+}
+
 int ereader_next_page(void)
 {
-    if (!book_file) return current_page + 1;
-
-    if (page_bookmarks[current_page + 1] == 0)
-        return current_page + 1; // cannot move yet
+    if (!can_go_next_page())
+        return current_page + 1;
 
     current_page++;
     return current_page + 1;
 }
 
-// Flips backward one page
-int ereader_prev_page(void) {
-    if (current_page > 0) {
-        current_page--;
-    }
+int ereader_prev_page(void)
+{
+    if (!can_go_prev_page())
+        return current_page + 1;
+
+    current_page--;
     return current_page + 1;
 }
 

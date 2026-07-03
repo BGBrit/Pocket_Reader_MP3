@@ -47,6 +47,8 @@ static void clear_screen(void) {
 
 static void handle_reader_input(uint32_t key)
 {
+    int old_page = current_page;
+
     if (key == LV_KEY_RIGHT) {
         ereader_next_page();
     }
@@ -59,22 +61,22 @@ static void handle_reader_input(uint32_t key)
         return;
     }
 
-    // refresh page text
-    lv_label_set_text(book_text_label, ereader_get_page_text());
+    // 🚨 only refresh UI if page actually changed
+    if (current_page != old_page) {
 
-    // get values
-    int page = ereader_get_current_page_number();
-    int pct  = ereader_get_progress_percent();
+        lv_label_set_text(book_text_label, ereader_get_page_text());
 
-    // IMPORTANT: single buffer only
-    char footer_buf[64];
+        int page = ereader_get_current_page_number();
+        int pct  = ereader_get_progress_percent();
 
-    snprintf(footer_buf, sizeof(footer_buf),
-             "Page %d (%d%%)",
-             page,
-             pct);
+        char footer_buf[64];
+        snprintf(footer_buf, sizeof(footer_buf),
+                 "Page %d (%d%%)",
+                 page,
+                 pct);
 
-    lv_label_set_text(page_footer_label, footer_buf);
+        lv_label_set_text(page_footer_label, footer_buf);
+    }
 }
 
 static void handle_menu_select(lv_obj_t * target)
