@@ -45,6 +45,71 @@ static void clear_screen(void) {
     lv_group_remove_all_objs(button_group);
 }
 
+static void handle_reader_input(uint32_t key)
+{
+    if (key == LV_KEY_RIGHT) {
+        ereader_next_page();
+    }
+    else if (key == LV_KEY_LEFT) {
+        ereader_prev_page();
+    }
+    else if (key == ' ') {
+        ereader_save_bookmark(current_book_path);
+        lv_label_set_text(page_footer_label, "Bookmark Saved!");
+        return;
+    }
+
+    // refresh page text
+    lv_label_set_text(book_text_label, ereader_get_page_text());
+
+    // get values
+    int page = ereader_get_current_page_number();
+    int pct  = ereader_get_progress_percent();
+
+    // IMPORTANT: single buffer only
+    char footer_buf[64];
+
+    snprintf(footer_buf, sizeof(footer_buf),
+             "Page %d (%d%%)",
+             page,
+             pct);
+
+    lv_label_set_text(page_footer_label, footer_buf);
+}
+
+static void handle_menu_select(lv_obj_t * target)
+{
+    int action_id = (intptr_t)lv_obj_get_user_data(target);
+
+    if(current_state == STATE_HOME) {
+        clear_screen();
+        if(action_id == 1) draw_bookshelf_page();
+        if(action_id == 2) draw_songs_page();
+    }
+    else if(current_state == STATE_BOOKSHELF) {
+        lv_obj_t * label = lv_obj_get_child(target, 0);
+        const char * filename = lv_label_get_text(label);
+
+        char full_path[512];
+        snprintf(full_path, sizeof(full_path),
+                 "%s/%s", BOOKS_DIRECTORY, filename);
+
+        if (ereader_open_book(full_path)) {
+            clear_screen();
+            draw_ereader_view_page();
+        }
+    }
+}
+
+static void handle_menu_navigation(uint32_t key)
+{
+    if (key == LV_KEY_LEFT || key == LV_KEY_UP)
+        lv_group_focus_prev(button_group);
+
+    if (key == LV_KEY_RIGHT || key == LV_KEY_DOWN)
+        lv_group_focus_next(button_group);
+}
+
 static void global_navigation_handler(lv_event_t * e) {
     uint32_t key = lv_event_get_key(e);
     lv_obj_t * target = lv_event_get_target(e);
@@ -66,61 +131,16 @@ static void global_navigation_handler(lv_event_t * e) {
     // LIST AND LAUNCHER TRACKING SCHEME (Menus and App Pickers)
     if (current_state != STATE_READING_VIEW) {
         if(key == ' ' || key == LV_KEY_ENTER) {
-            int action_id = (intptr_t)lv_obj_get_user_data(target);
-
-            if(current_state == STATE_HOME) {
-                clear_screen();
-                if(action_id == 1) draw_bookshelf_page();
-                if(action_id == 2) draw_songs_page();
-            }
-            else if(current_state == STATE_BOOKSHELF) {
-                // Pull filename string directly off the highlighted button's child label
-                lv_obj_t * label = lv_obj_get_child(target, 0);
-                const char * filename = lv_label_get_text(label);
-
-                char full_path[512];
-                snprintf(full_path, sizeof(full_path), "%s/%s", BOOKS_DIRECTORY, filename);
-
-                if (ereader_open_book(full_path)) {
-                    clear_screen();
-                    draw_ereader_view_page();
-                }
-            }
+            handle_menu_select(target);
             return;
         }
 
-        if(key == LV_KEY_LEFT || key == LV_KEY_UP)    lv_group_focus_prev(button_group);
-        if(key == LV_KEY_RIGHT || key == LV_KEY_DOWN) lv_group_focus_next(button_group);
+        handle_menu_navigation(key);
     }
 
     // ACTIVE READING CANVAS ENGINE CONTROLS (Page Turning Loops)
     else if (current_state == STATE_READING_VIEW) {
-        if (key == LV_KEY_RIGHT) { // Right Arrow -> Next Page
-            ereader_next_page();
-            lv_label_set_text(book_text_label, ereader_get_page_text());
-
-            char footer_buf[32];
-            snprintf(footer_buf, sizeof(footer_buf), "Page %d", ereader_get_current_page_number());
-            lv_label_set_text(page_footer_label, footer_buf);
-        }
-        else if (key == LV_KEY_LEFT) { // Left Arrow -> Previous Page
-            ereader_prev_page();
-
-            lv_label_set_text(book_text_label, ereader_get_page_text());
-
-            char footer_buf[32];
-            snprintf(footer_buf, sizeof(footer_buf),
-                    "Page %d", ereader_get_current_page_number());
-
-            lv_label_set_text(page_footer_label, footer_buf);
-        }
-        else if (key == ' ') { // Spacebar -> Save Bookmark
-            ereader_save_bookmark(current_book_path); // Save the bookmark for the current book
-            printf("Bookmark saved for book: %s at page %d\n", current_book_path, current_page);
-
-            // Optional: Provide visual feedback to the user
-            lv_label_set_text(page_footer_label, "Bookmark Saved!");
-        }
+        handle_reader_input(key);
     }
 }
 
@@ -313,7 +333,13 @@ void draw_ereader_view_page(void) {
     lv_obj_set_style_text_color(page_footer_label, lv_color_make(120, 120, 120), 0);
     lv_obj_align(page_footer_label, LV_ALIGN_BOTTOM_MID, 0, -2);
 
-    char footer_buf[32];
-    snprintf(footer_buf, sizeof(footer_buf), "Page %d", ereader_get_current_page_number());
+    int page = ereader_get_current_page_number();
+    int pct  = ereader_get_progress_percent();
+
+    char footer_buf[64];
+
+    snprintf(footer_buf, sizeof(footer_buf),
+            "Page %d (%d%%)", page, pct);
+
     lv_label_set_text(page_footer_label, footer_buf);
 }

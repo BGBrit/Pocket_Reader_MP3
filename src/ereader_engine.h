@@ -9,6 +9,7 @@ int   ereader_next_page(void);
 int   ereader_prev_page(void);
 int   ereader_get_current_page_number(void);
 void  ereader_save_bookmark(const char *file_path);
+int ereader_get_progress_percent(void);
 
 // Global variables (declared as extern)
 extern char current_book_path[512];
