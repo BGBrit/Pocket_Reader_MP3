@@ -67,7 +67,7 @@ static void handle_reader_input(uint32_t key)
         lv_label_set_text(book_text_label, ereader_get_page_text());
 
         int page = ereader_get_current_page_number();
-        int pct  = ereader_get_progress_percent(page);
+        int pct  = ereader_get_progress_percent();
 
         char footer_buf[64];
         snprintf(footer_buf, sizeof(footer_buf),
@@ -185,25 +185,7 @@ void draw_home_page(void) {
     lv_group_focus_obj(reader_btn);
 }
 
-static const char *strip_txt_extension(const char *filename)
-{
-    size_t len = strlen(filename);
 
-    if (len > 4 && strcmp(filename + len - 4, ".txt") == 0) {
-        static char buffer[256];
-
-        size_t copy_len = len - 4;
-        if (copy_len >= sizeof(buffer))
-            copy_len = sizeof(buffer) - 1;
-
-        strncpy(buffer, filename, copy_len);
-        buffer[copy_len] = '\0';
-
-        return buffer;
-    }
-
-    return filename;
-}
 
 void draw_bookshelf_page(void) {
     current_state = STATE_BOOKSHELF;
@@ -242,7 +224,8 @@ void draw_bookshelf_page(void) {
                 lv_obj_add_event_cb(btn, global_navigation_handler, LV_EVENT_KEY, NULL);
 
                 lv_obj_t * lbl = lv_label_create(btn);
-                lv_label_set_text(lbl, strip_txt_extension(entry->d_name));
+                lv_label_set_text(lbl, entry->d_name);
+
                 lv_group_add_obj(button_group, btn);
                 if(items_found == 0) lv_group_focus_obj(btn);
                 items_found++;
@@ -355,7 +338,7 @@ void draw_ereader_view_page(void) {
     lv_obj_align(page_footer_label, LV_ALIGN_BOTTOM_MID, 0, -2);
 
     int page = ereader_get_current_page_number();
-    int pct  = ereader_get_progress_percent(page);
+    int pct  = ereader_get_progress_percent();
 
     char footer_buf[64];
 
