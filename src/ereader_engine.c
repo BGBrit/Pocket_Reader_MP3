@@ -8,11 +8,10 @@ char current_book_path[512] = ""; // Initialize to an empty string
 int current_page = 0;
 
 #define PAGE_SIZE 450 // Max characters to display on a 240x320 portrait screen at once
-#define MAX_PAGES 1000
+static long *page_bookmarks = NULL;
+static int page_bookmarks_capacity = 0;
 
 static FILE * book_file = NULL;
-static long page_bookmarks[MAX_PAGES]; // Holds the exact file character position for every page start
-static int max_pages_visited = 0;
 static char current_page_buffer[PAGE_SIZE + 1];
 
 static size_t read_raw_block(char *raw_buffer) {
@@ -219,7 +218,6 @@ static void set_current_book_path(const char *file_path) {
 }
 
 static void reset_reader_state_after_open(void) {
-    max_pages_visited = current_page;
     memset(current_page_buffer, 0, sizeof(current_page_buffer));
 }
 
@@ -235,8 +233,9 @@ static void seek_to_page_number(int target_page)
 
 int ereader_open_book(const char *file_path)
 {
+    page_bookmarks_capacity = 100;
+    page_bookmarks = malloc(sizeof(long) * page_bookmarks_capacity);
     page_bookmarks[0] = 0;
-    max_pages_visited = 0;
     book_file = open_book_file(file_path);
 
     if (!book_file) {
@@ -253,7 +252,6 @@ int ereader_open_book(const char *file_path)
     }
 
     // ONLY runtime reset (single source of truth)
-    max_pages_visited = current_page;
     memset(current_page_buffer, 0, sizeof(current_page_buffer));
 
     printf("Book opened: %s at page %d\n", file_path, current_page);
@@ -267,6 +265,18 @@ void ereader_close_book(void) {
         fclose(book_file);
         book_file = NULL;
     }
+}
+
+static void ensure_page_capacity(int needed_page)
+{
+    if (needed_page < page_bookmarks_capacity)
+        return;
+
+    while (needed_page >= page_bookmarks_capacity)
+        page_bookmarks_capacity *= 2;
+
+    page_bookmarks = realloc(page_bookmarks,
+                              sizeof(long) * page_bookmarks_capacity);
 }
 
 char *ereader_get_page_text(void) {
@@ -287,15 +297,9 @@ char *ereader_get_page_text(void) {
 
     size_t used = build_page(raw_buffer, &bytes_used);
     size_t cutoff = used;
-
-    if (current_page + 1 > max_pages_visited &&
-        current_page + 1 < MAX_PAGES)
-    {
-        page_bookmarks[current_page + 1] =
-            page_bookmarks[current_page] + bytes_used;
-
-        max_pages_visited++;
-    }
+    ensure_page_capacity(current_page + 1);
+    page_bookmarks[current_page + 1] =
+    page_bookmarks[current_page] + bytes_used;
 
     return current_page_buffer;
 }
