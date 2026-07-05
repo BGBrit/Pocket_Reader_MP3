@@ -6,12 +6,14 @@
 #include "ereader_engine.h"
 
 // External engine hooks declared inside ereader_engine.c
-int   ereader_open_book(const char * file_path);
+int ereader_open_book(EReaderBook *book, const char *file_path);
 void  ereader_close_book(void);
-char* ereader_get_page_text(void);
-int   ereader_next_page(void);
-int   ereader_prev_page(void);
-int   ereader_get_current_page_number(void);
+char *ereader_get_page_text(EReaderBook *book);
+int ereader_next_page(EReaderBook *book);
+int ereader_prev_page(EReaderBook *book);
+
+int ereader_get_current_page_number(EReaderBook *book);
+static EReaderBook active_book;
 
 typedef enum {
     STATE_HOME,
@@ -47,27 +49,27 @@ static void clear_screen(void) {
 
 static void handle_reader_input(uint32_t key)
 {
-    int old_page = current_page;
+    int old_page = active_book.current_page;
 
     if (key == LV_KEY_RIGHT) {
-        ereader_next_page();
+        ereader_next_page(&active_book);
     }
     else if (key == LV_KEY_LEFT) {
-        ereader_prev_page();
+        ereader_prev_page(&active_book);
     }
     else if (key == ' ') {
-        ereader_save_bookmark(current_book_path);
+        ereader_save_bookmark(&active_book);
         lv_label_set_text(page_footer_label, "Bookmark Saved!");
         return;
     }
 
     // 🚨 only refresh UI if page actually changed
-    if (current_page != old_page) {
+    if (active_book.current_page != old_page) {
 
-        lv_label_set_text(book_text_label, ereader_get_page_text());
+        lv_label_set_text(book_text_label, ereader_get_page_text(&active_book));
 
-        int page = ereader_get_current_page_number();
-        int pct  = ereader_get_progress_percent();
+        int page = ereader_get_current_page_number(&active_book);
+        int pct  = ereader_get_progress_percent(&active_book);
 
         char footer_buf[64];
         snprintf(footer_buf, sizeof(footer_buf),
@@ -96,7 +98,7 @@ static void handle_menu_select(lv_obj_t * target)
         snprintf(full_path, sizeof(full_path),
                  "%s/%s", BOOKS_DIRECTORY, filename);
 
-        if (ereader_open_book(full_path)) {
+        if (ereader_open_book(&active_book, full_path)) {
             clear_screen();
             draw_ereader_view_page();
         }
@@ -299,6 +301,7 @@ void draw_songs_page(void) {
 void init_pocket_reader_ui(void) {
     // Connect into the default focus engine group created by hal.c
     button_group = lv_group_get_default();
+    ereader_init_book(&active_book);
     draw_home_page();
 }
 
@@ -330,15 +333,15 @@ void draw_ereader_view_page(void) {
     lv_obj_align(book_text_label, LV_ALIGN_TOP_MID, 0, 15);
 
     // Initial textbook content extraction pull from our new file engine
-    lv_label_set_text(book_text_label, ereader_get_page_text());
+    lv_label_set_text(book_text_label, ereader_get_page_text(&active_book));
 
     // Clean page metadata tracker footer layout bar
     page_footer_label = lv_label_create(bg);
     lv_obj_set_style_text_color(page_footer_label, lv_color_make(120, 120, 120), 0);
     lv_obj_align(page_footer_label, LV_ALIGN_BOTTOM_MID, 0, -2);
 
-    int page = ereader_get_current_page_number();
-    int pct  = ereader_get_progress_percent();
+    int page = ereader_get_current_page_number(&active_book);
+    int pct  = ereader_get_progress_percent(&active_book);
 
     char footer_buf[64];
 
