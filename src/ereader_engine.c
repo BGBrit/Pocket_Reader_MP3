@@ -261,3 +261,8 @@ int ereader_get_progress_percent(EReaderBook *book)
 
     return (int)((current_offset * 100) / size);
 }
+
+int ereader_get_current_page_number(void)
+{
+    return current_page;
+}

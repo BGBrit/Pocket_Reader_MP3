@@ -113,7 +113,7 @@ void ereader_save_books(
 
 int ereader_get_progress_percent(EReaderBook *book);
 
-
+int ereader_get_current_page_number(void);
 
 #ifdef __cplusplus
 }

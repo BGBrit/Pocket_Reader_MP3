@@ -2,6 +2,7 @@
 
 #include "home/home.h"
 #include "bookshelf/bookshelf.h"
+#include "reader_view.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -10,7 +11,8 @@
 typedef enum
 {
     APP_HOME,
-    APP_BOOKSHELF
+    APP_BOOKSHELF,
+    APP_READER
 
 } AppState;
 
@@ -99,9 +101,40 @@ static void ui_key_handler(lv_event_t *e)
             {
                 open_home();
             }
+            else if(key == ' ')
+            {
+                EReaderBook *book =
+                    bookshelf_get_selected();
+
+                if(book)
+                {
+                    current_app = APP_READER;
+
+                     reader_open(book);
+                }
+            }
             else
             {
                 bookshelf_handle_key(key);
+            }
+
+            break;
+
+        case APP_READER:
+            if(key == 'b' ||
+            key == 'B' ||
+            key == LV_KEY_ESC)
+            {
+                reader_close();
+
+                current_app = APP_BOOKSHELF;
+
+                bookshelf_open();
+            }
+
+            else
+            {
+                reader_handle_key(key);
             }
 
             break;
