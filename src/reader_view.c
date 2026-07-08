@@ -36,7 +36,7 @@ static void reader_refresh(void)
     snprintf(
         footer,
         sizeof(footer),
-        "Page %d   %d%%",
+        "Page %d     %d%%",
         ereader_get_current_page_number(),
         ereader_get_progress_percent(active_book)
     );
@@ -82,15 +82,35 @@ void reader_open(EReaderBook *book)
         320
     );
 
+    lv_obj_clear_flag(
+        bg,
+        LV_OBJ_FLAG_SCROLLABLE
+    );
+
+    lv_obj_set_scrollbar_mode(
+        bg,
+        LV_SCROLLBAR_MODE_OFF
+    );
+
+    lv_obj_set_style_radius(bg, 0, 0);
+
+    lv_obj_set_style_border_width(bg, 0, 0);
+
+    lv_obj_set_style_bg_color(
+        bg,
+        lv_color_make(250,248,245),
+        0
+    );
+
 
 
     reader_text =
         lv_label_create(bg);
 
-
-    lv_obj_set_width(
+    lv_obj_set_size(
         reader_text,
-        220
+        220,
+        240
     );
 
 
@@ -104,7 +124,7 @@ void reader_open(EReaderBook *book)
         reader_text,
         LV_ALIGN_TOP_MID,
         0,
-        10
+        12
     );
 
 
@@ -112,12 +132,39 @@ void reader_open(EReaderBook *book)
     reader_footer =
         lv_label_create(bg);
 
+    lv_obj_t *divider =
+        lv_obj_create(bg);
+
+    lv_obj_set_size(
+        divider,
+        220,
+        1
+    );
+
+    lv_obj_align(
+        divider,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -28
+    );
+
+    lv_obj_set_style_radius(
+        divider,
+        0,
+        0
+    );
+
+    lv_obj_set_style_pad_all(
+        divider,
+        0,
+        0
+    );
 
     lv_obj_align(
         reader_footer,
         LV_ALIGN_BOTTOM_MID,
         0,
-        -5
+        -8
     );
 
 
