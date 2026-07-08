@@ -163,7 +163,7 @@ void reader_handle_key(uint32_t key)
         ereader_save_bookmark(
             active_book
         );
-
+        bookshelf_save_books();
 
         printf("Bookmark saved\n");
     }

@@ -82,6 +82,7 @@ static void ui_key_handler(lv_event_t *e)
 
             if(key == ' ')
             {
+                bookshelf_load_books();
                 open_bookshelf();
             }
             else
