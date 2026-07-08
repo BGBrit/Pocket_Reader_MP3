@@ -175,7 +175,33 @@ int ereader_open_book(EReaderBook *book)
     current_offset = book->bookmark_offset;
 
     page_count = 0;
-    page_offsets[0] = current_offset;
+    page_offsets[0] = 0;
+
+    long offset = 0;
+
+
+    for(int i = 0; i < current_page; i++)
+    {
+        PageResult page =
+            render_page_at_offset(offset);
+
+
+        offset += page.bytes_used;
+
+
+        if(page_count < MAX_PAGES - 1)
+        {
+            page_count++;
+            page_offsets[page_count] = offset;
+        }
+    }
+
+
+    /*
+    * Restore current location
+    */
+    current_offset =
+        page_offsets[current_page];
 
     fseek(book_file, current_offset, SEEK_SET);
 
