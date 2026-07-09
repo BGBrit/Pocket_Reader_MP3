@@ -2,7 +2,8 @@
 #define EREADER_ENGINE_H
 
 #include <stddef.h>
-
+#include <stdint.h>
+#include <stdbool.h>
 #define PAGE_SIZE 450
 
 
@@ -48,7 +49,9 @@ typedef struct {
 
 void ereader_init_book(EReaderBook *book);
 
+typedef bool (*PageFitsCallback)(const char *text);
 
+void ereader_set_page_fits_callback(PageFitsCallback callback);
 
 // ======================
 // Book loading

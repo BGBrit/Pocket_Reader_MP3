@@ -26,6 +26,14 @@ static PageResult empty_page(void)
     return p;
 }
 
+static PageFitsCallback page_fits_callback = NULL;
+
+
+void ereader_set_page_fits_callback(PageFitsCallback callback)
+{
+    page_fits_callback = callback;
+}
+
 // ======================
 // UTF8 / formatting helpers
 // ======================
@@ -97,43 +105,129 @@ static void handle_newline(const char *raw,
 // ======================
 // CORE PAGE BUILDER
 // ======================
+
 static PageResult build_page(const char *raw, size_t bytes_read)
 {
     PageResult result = {0};
 
     uint32_t r = 0;
     uint32_t w = 0;
-    uint32_t line = 0;
     uint32_t used = 0;
 
-    while (raw[r] && w < PAGE_SIZE) {
 
-        int c = sanitize_character(raw, r, result.text, &w);
-        if (c > 0) {
-            r += c;
-            used += c;
-            continue;
-        }
+    while(raw[r] && r < bytes_read)
+    {
+        uint32_t word_start = r;
 
-        if (raw[r] == '\r') {
+        char word[128];
+        uint32_t word_len = 0;
+
+
+        /*
+         * Skip spaces/newlines before word
+         */
+        while(raw[r] == ' ' ||
+              raw[r] == '\n' ||
+              raw[r] == '\r')
+        {
+            if(w < PAGE_SIZE - 1)
+            {
+                result.text[w++] = raw[r];
+            }
+
             r++;
-            continue;
-        }
-
-        if (raw[r] == '\n') {
-            handle_newline(raw, &r, result.text, &w, &line);
             used++;
-            r++;
-            continue;
         }
 
-        result.text[w++] = raw[r++];
-        used++;
-        line++;
+
+        if(!raw[r])
+            break;
+
+
+
+        word_start = r;
+
+
+        /*
+         * Read word WITHOUT committing offset yet
+         */
+        while(raw[r] &&
+              raw[r] != ' ' &&
+              raw[r] != '\n' &&
+              raw[r] != '\r')
+        {
+            if(word_len < sizeof(word)-1)
+                word[word_len++] = raw[r];
+
+            r++;
+        }
+
+        word[word_len] = '\0';
+
+
+
+        /*
+         * Test word
+         */
+        char test[PAGE_SIZE];
+
+        memcpy(
+            test,
+            result.text,
+            w
+        );
+
+        memcpy(
+            &test[w],
+            word,
+            word_len
+        );
+
+        test[w + word_len] = '\0';
+
+
+
+        if(page_fits_callback &&
+           !page_fits_callback(test))
+        {
+            /*
+             * Do not consume this word.
+             */
+            r = word_start;
+            break;
+        }
+
+
+
+        /*
+         * Commit word
+         */
+        memcpy(
+            &result.text[w],
+            word,
+            word_len
+        );
+
+        w += word_len;
+        used += word_len;
+
+
+
+        if(w >= PAGE_SIZE - 2)
+            break;
     }
+
 
     result.text[w] = '\0';
     result.bytes_used = used;
+
+
+    printf(
+        "PAGE OUTPUT chars=%d bytes=%d\n",
+        w,
+        used
+    );
+
 
     return result;
 }

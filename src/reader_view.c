@@ -13,7 +13,22 @@ static lv_obj_t *reader_text;
 
 static lv_obj_t *reader_footer;
 
+static bool reader_page_fits(const char *text)
+{
+    lv_point_t size;
 
+    lv_text_get_size(
+        &size,
+        text,
+        LV_FONT_DEFAULT,
+        0,
+        0,
+        220,
+        LV_TEXT_FLAG_NONE
+    );
+
+    return size.y <= 250;
+}
 
 // =====================================================
 // Refresh displayed page
@@ -61,6 +76,10 @@ void reader_open(EReaderBook *book)
 
     ereader_open_book(
         active_book
+    );
+
+    ereader_set_page_fits_callback(
+        reader_page_fits
     );
 
 
