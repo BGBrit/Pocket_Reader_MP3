@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ereader_engine.h"
+#include <sys/stat.h>
 
 #define PAGE_SIZE 450
 #define MAX_PAGES 10000
@@ -17,6 +18,9 @@ static FILE *book_file = NULL;
 static long page_offsets[MAX_PAGES];
 static int page_count = 0;
 
+static PageResult build_page(const char *raw, size_t bytes_read);
+static PageResult render_page_at_offset(long offset);
+
 // ======================
 // Page Result Builder
 // ======================
@@ -28,7 +32,154 @@ static PageResult empty_page(void)
 
 static PageFitsCallback page_fits_callback = NULL;
 
+static int file_exists(const char *path)
+{
+    FILE *fp = fopen(path, "r");
 
+    if(fp)
+    {
+        fclose(fp);
+        return 1;
+    }
+
+    return 0;
+}
+
+// ======================
+// FILE RENDER PIPELINE
+// ======================
+static PageResult render_page_at_offset(long offset)
+{
+    PageResult result = {0};
+
+    if (!book_file)
+        return result;
+
+    fseek(book_file, offset, SEEK_SET);
+
+    char raw[PAGE_SIZE * 2];
+    size_t read = fread(raw, 1, sizeof(raw) - 1, book_file);
+    raw[read] = '\0';
+
+    return build_page(raw, read);
+}
+
+int ereader_build_offsets(EReaderBook *book)
+{
+    FILE *build_file = fopen(book->path, "r");
+
+    if(!build_file)
+        return 0;
+
+
+    FILE *offset_file = fopen(book->offset_path, "wb");
+
+    if(!offset_file)
+    {
+        fclose(build_file);
+        return 0;
+    }
+
+
+    book_file = build_file;
+
+
+    long offset = 0;
+    int pages_written = 0;
+
+
+    while(1)
+    {
+        PageResult page =
+            render_page_at_offset(offset);
+
+
+        if(page.bytes_used == 0)
+            break;
+
+
+        size_t written =
+            fwrite(
+                &offset,
+                sizeof(long),
+                1,
+                offset_file
+            );
+
+
+        if(written != 1)
+        {
+            printf("OFFSET WRITE FAILED\n");
+            break;
+        }
+
+
+        pages_written++;
+
+        offset += page.bytes_used;
+    }
+
+
+    printf(
+        "Built %d pages of offsets\n",
+        pages_written
+    );
+
+
+    printf("before fflush\n");
+    fflush(offset_file);
+
+    printf("before fclose offset\n");
+    fclose(offset_file);
+
+    printf("before fclose book\n");
+    fclose(build_file);
+
+    printf("before clear book_file\n");
+
+    book_file = NULL;
+
+    printf("returning from build\n");
+
+    return 1;
+}
+
+int ereader_load_offsets(EReaderBook *book)
+{
+    FILE *fp =
+        fopen(book->offset_path, "rb");
+
+
+    if(!fp)
+        return 0;
+
+
+    page_count = 0;
+
+
+    while(page_count < MAX_PAGES &&
+          fread(
+              &page_offsets[page_count],
+              sizeof(long),
+              1,
+              fp
+          ) == 1)
+    {
+        page_count++;
+    }
+
+
+    fclose(fp);
+
+
+    printf(
+        "Loaded %d offsets\n",
+        page_count
+    );
+
+
+    return page_count > 0;
+}
 void ereader_set_page_fits_callback(PageFitsCallback callback)
 {
     page_fits_callback = callback;
@@ -221,34 +372,7 @@ static PageResult build_page(const char *raw, size_t bytes_read)
     result.text[w] = '\0';
     result.bytes_used = used;
 
-
-    printf(
-        "PAGE OUTPUT chars=%d bytes=%d\n",
-        w,
-        used
-    );
-
-
     return result;
-}
-
-// ======================
-// FILE RENDER PIPELINE
-// ======================
-static PageResult render_page_at_offset(long offset)
-{
-    PageResult result = {0};
-
-    if (!book_file)
-        return result;
-
-    fseek(book_file, offset, SEEK_SET);
-
-    char raw[PAGE_SIZE * 2];
-    size_t read = fread(raw, 1, sizeof(raw) - 1, book_file);
-    raw[read] = '\0';
-
-    return build_page(raw, read);
 }
 
 // ======================
@@ -261,43 +385,90 @@ void ereader_init_book(EReaderBook *book)
 
 int ereader_open_book(EReaderBook *book)
 {
-    book_file = fopen(book->path, "r");
-    if (!book_file)
+    book_file =
+        fopen(book->path, "r");
+
+
+    if(!book_file)
         return 0;
 
-    current_page = book->bookmark_page;
-    current_offset = book->bookmark_offset;
 
-    page_count = 0;
-    page_offsets[0] = 0;
-
-    long offset = 0;
-
-
-    for(int i = 0; i < current_page; i++)
+    /*
+     * Create offsets if this book has never been opened
+     */
+    if(!file_exists(book->offset_path))
     {
-        PageResult page =
-            render_page_at_offset(offset);
+        printf(
+            "Building offsets for %s\n",
+            book->path
+        );
 
 
-        offset += page.bytes_used;
+        fclose(book_file);
+        book_file = NULL;
 
 
-        if(page_count < MAX_PAGES - 1)
+        if(!ereader_build_offsets(book))
         {
-            page_count++;
-            page_offsets[page_count] = offset;
+            printf("Offset build failed\n");
+            return 0;
         }
+
+
+        /*
+         * Re-open book after building
+         */
+        book_file =
+            fopen(book->path, "r");
+
+
+        if(!book_file)
+            return 0;
     }
 
 
     /*
-    * Restore current location
-    */
+     * Load offset table
+     */
+    if(!ereader_load_offsets(book))
+    {
+        printf("Could not load offsets\n");
+
+        fclose(book_file);
+        book_file = NULL;
+
+        return 0;
+    }
+
+
+    /*
+     * Restore bookmark
+     */
+    current_page =
+        book->bookmark_page;
+
+
+    if(current_page >= page_count)
+        current_page = 0;
+
+
     current_offset =
         page_offsets[current_page];
 
-    fseek(book_file, current_offset, SEEK_SET);
+
+    fseek(
+        book_file,
+        current_offset,
+        SEEK_SET
+    );
+
+
+    printf(
+        "Opened page=%d offset=%ld\n",
+        current_page,
+        current_offset
+    );
+
 
     return 1;
 }
@@ -330,30 +501,30 @@ PageResult ereader_get_page(void)
 // ======================
 // NAVIGATION (NO RENDERING HERE)
 // ======================
-void ereader_next_page(size_t bytes_used)
+void ereader_next_page(void)
 {
-    if (!book_file)
+    if(current_page >= page_count - 1)
         return;
 
-    current_page++;
-    current_offset += bytes_used;
 
-    if (page_count < MAX_PAGES - 1) {
-        page_count++;
-        page_offsets[page_count] = current_offset;
-    }
+    current_page++;
+
+
+    current_offset =
+        page_offsets[current_page];
 }
 
 void ereader_prev_page(void)
 {
-    if (current_page <= 0)
+    if(current_page <= 0)
         return;
+
 
     current_page--;
 
-    if (current_page < page_count) {
-        current_offset = page_offsets[current_page];
-    }
+
+    current_offset =
+        page_offsets[current_page];
 }
 
 // ======================
@@ -362,7 +533,6 @@ void ereader_prev_page(void)
 void ereader_save_bookmark(EReaderBook *book)
 {
     book->bookmark_page = current_page;
-    book->bookmark_offset = current_offset;
 }
 
 // ======================

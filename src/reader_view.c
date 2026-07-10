@@ -205,9 +205,7 @@ void reader_handle_key(uint32_t key)
             ereader_get_page();
 
 
-        ereader_next_page(
-            page.bytes_used
-        );
+        ereader_next_page();
 
 
         reader_refresh();
@@ -230,6 +228,8 @@ void reader_handle_key(uint32_t key)
             active_book
         );
         bookshelf_save_books();
+
+        //bookshelf_save_books();
 
         printf("Bookmark saved\n");
     }

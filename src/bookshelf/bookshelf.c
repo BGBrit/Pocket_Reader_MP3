@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <sys/stat.h>
 
 
 #define MAX_BOOKS 256
@@ -25,6 +26,14 @@ static int selected_book = 0;
 
 static lv_group_t *button_group;
 
+static int file_exists(const char *path)
+{
+    struct stat buffer;
+
+    return (
+        stat(path, &buffer) == 0
+    );
+}
 
 void bookshelf_save_books(void)
 {
@@ -37,10 +46,9 @@ void bookshelf_save_books(void)
     {
         fprintf(
             fp,
-            "%s|%d|%ld\n",
+            "%s|%d\n",
             books[i].path,
-            books[i].bookmark_page,
-            books[i].bookmark_offset
+            books[i].bookmark_page
         );
     }
 
@@ -49,53 +57,84 @@ void bookshelf_save_books(void)
 
 void bookshelf_load_books(void)
 {
+    FILE *fp = fopen(BOOK_DB_FILE, "r");
+
     EReaderBook saved[MAX_BOOKS];
     int saved_count = 0;
 
-    /*
-     * Load saved database
-     */
-    FILE *fp = fopen(BOOK_DB_FILE, "r");
 
     if(fp)
     {
-        while(saved_count < MAX_BOOKS)
+        char line[1024];
+
+        while(fgets(line, sizeof(line), fp))
         {
-            if(fscanf(
-                fp,
-                "%511[^|]|%d|%ld\n",
+            char *sep = strchr(line, '|');
+
+            if(!sep)
+                continue;
+
+
+            *sep = '\0';
+
+
+            memset(
+                &saved[saved_count],
+                0,
+                sizeof(EReaderBook)
+            );
+
+
+            strncpy(
                 saved[saved_count].path,
-                &saved[saved_count].bookmark_page,
-                &saved[saved_count].bookmark_offset
-            ) != 3)
-            {
-                break;
-            }
+                line,
+                sizeof(saved[saved_count].path)-1
+            );
+
+
+            saved[saved_count].bookmark_page =
+                atoi(sep + 1);
+
 
             saved_count++;
+
+
+            if(saved_count >= MAX_BOOKS)
+                break;
         }
 
         fclose(fp);
     }
 
+
     book_count = 0;
+
 
     DIR *dir = opendir(BOOKS_DIRECTORY);
 
     if(!dir)
         return;
 
+
     struct dirent *entry;
+
 
     while((entry = readdir(dir)) != NULL)
     {
         if(entry->d_name[0] == '.')
             continue;
 
+        const char *ext = strrchr(entry->d_name, '.');
+
+        if(ext == NULL || strcmp(ext, ".txt") != 0)
+            continue;
+
         if(book_count >= MAX_BOOKS)
             break;
 
+
         char full_path[512];
+
 
         snprintf(
             full_path,
@@ -105,49 +144,67 @@ void bookshelf_load_books(void)
             entry->d_name
         );
 
-        int found = 0;
+
+        memset(
+            &books[book_count],
+            0,
+            sizeof(EReaderBook)
+        );
+
+
+        strncpy(
+            books[book_count].path,
+            full_path,
+            sizeof(books[book_count].path)-1
+        );
+
 
         /*
-         * Restore bookmark if book exists in database
+         * Restore bookmark
          */
         for(int i = 0; i < saved_count; i++)
         {
             if(strcmp(saved[i].path, full_path) == 0)
             {
-                books[book_count] = saved[i];
-                found = 1;
+                books[book_count].bookmark_page =
+                    saved[i].bookmark_page;
+
                 break;
             }
         }
 
-        /*
-         * New book
-         */
-        if(!found)
-        {
-            memset(
-                &books[book_count],
-                0,
-                sizeof(EReaderBook)
-            );
 
-            strncpy(
-                books[book_count].path,
-                full_path,
-                sizeof(books[book_count].path) - 1
-            );
-        }
+        snprintf(
+            books[book_count].offset_path,
+            sizeof(books[book_count].offset_path),
+            "%s.offsets",
+            full_path
+        );
+
+
+        printf(
+            "Loaded book %d: %s\n",
+            book_count,
+            books[book_count].path
+        );
+
 
         book_count++;
     }
 
+
     closedir(dir);
+
 
     if(selected_book >= book_count)
         selected_book = 0;
+
+
+    printf(
+        "Books loaded: %d\n",
+        book_count
+    );
 }
-
-
 
 void bookshelf_open(void)
 {

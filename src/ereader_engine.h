@@ -16,13 +16,13 @@ extern "C" {
 // Book information
 // ======================
 
-typedef struct {
-
+typedef struct
+{
     char path[512];
 
-    // Saved position
+    char offset_path[512];
+
     int bookmark_page;
-    long bookmark_offset;
 
 } EReaderBook;
 
@@ -61,7 +61,9 @@ int ereader_open_book(EReaderBook *book);
 
 void ereader_close_book(void);
 
+int ereader_build_offsets(EReaderBook *book);
 
+int ereader_load_offsets(EReaderBook *book);
 
 // ======================
 // Rendering
@@ -78,7 +80,7 @@ PageResult ereader_get_page(void);
 // These DO NOT render.
 // They only update engine position.
 
-void ereader_next_page(size_t bytes_used);
+void ereader_next_page(void);
 
 void ereader_prev_page(void);
 
