@@ -53,6 +53,12 @@ typedef bool (*PageFitsCallback)(const char *text);
 
 void ereader_set_page_fits_callback(PageFitsCallback callback);
 
+typedef void (*OffsetProgressCallback)(int percent);
+
+void ereader_set_offset_progress_callback(
+    OffsetProgressCallback callback
+);
+
 // ======================
 // Book loading
 // ======================

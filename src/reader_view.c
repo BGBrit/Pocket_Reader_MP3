@@ -14,6 +14,83 @@ static lv_obj_t *reader_text;
 
 static lv_obj_t *reader_footer;
 
+
+static lv_obj_t *offset_bar = NULL;
+static lv_obj_t *offset_label = NULL;
+
+static void create_offset_loading_ui(void)
+{
+    offset_label = lv_label_create(
+        lv_screen_active()
+    );
+
+    lv_label_set_text(
+        offset_label,
+        "Building page index..."
+    );
+
+    lv_obj_align(
+        offset_label,
+        LV_ALIGN_CENTER,
+        0,
+        -30
+    );
+
+
+    offset_bar = lv_bar_create(
+        lv_screen_active()
+    );
+
+    lv_obj_set_size(
+        offset_bar,
+        180,
+        15
+    );
+
+    lv_obj_align(
+        offset_bar,
+        LV_ALIGN_CENTER,
+        0,
+        10
+    );
+
+
+    lv_bar_set_value(
+        offset_bar,
+        0,
+        LV_ANIM_OFF
+    );
+}
+
+static void reader_offset_progress_callback(int percent)
+{
+    printf("OFFSET PROGRESS %d%%\n", percent);
+
+    if(offset_bar)
+    {
+        lv_bar_set_value(
+            offset_bar,
+            percent,
+            LV_ANIM_OFF
+        );
+    }
+
+    if(offset_label)
+    {
+        lv_label_set_text_fmt(
+            offset_label,
+            "Building page index...\n%d%%",
+            percent
+        );
+    }
+
+    lv_timer_handler();
+
+    lv_refr_now(
+        lv_display_get_default()
+    );
+}
+
 // =====================================================
 // Refresh displayed page
 // =====================================================
@@ -80,11 +157,22 @@ void reader_open(EReaderBook *book)
 {
     active_book = book;
 
+    create_offset_loading_ui();
+
+    lv_timer_handler();
+
+    lv_refr_now(
+        lv_display_get_default()
+    );
+    ereader_set_offset_progress_callback(
+        reader_offset_progress_callback
+    );
 
     ereader_open_book(
         active_book
     );
 
+    ereader_set_offset_progress_callback(NULL);
     lv_obj_clean(
         lv_screen_active()
     );

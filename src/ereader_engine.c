@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include "lvgl.h"
 #define PAGE_SIZE 450
-#define MAX_PAGES 10000
+#define MAX_PAGES 50000
 
 // ======================
 // Runtime State
@@ -20,6 +20,16 @@ static int page_count = 0;
 
 static PageResult build_page(const char *raw, size_t bytes_read);
 static PageResult render_page_at_offset(long offset);
+
+static lv_obj_t * offset_progress_bar = NULL;
+static lv_obj_t * offset_progress_label = NULL;
+static OffsetProgressCallback progress_callback = NULL;
+
+void ereader_set_offset_progress_callback(
+    OffsetProgressCallback callback)
+{
+    progress_callback = callback;
+}
 
 // ======================
 // Page Result Builder
@@ -66,10 +76,15 @@ static PageResult render_page_at_offset(long offset)
 
 int ereader_build_offsets(EReaderBook *book)
 {
+
     FILE *build_file = fopen(book->path, "r");
 
     if(!build_file)
         return 0;
+
+    fseek(build_file, 0, SEEK_END);
+    long total_bytes = ftell(build_file);
+    rewind(build_file);
 
 
     FILE *offset_file = fopen(book->offset_path, "wb");
@@ -123,13 +138,28 @@ int ereader_build_offsets(EReaderBook *book)
         pages_written++;
 
         offset += page.bytes_used;
+        static int last_percent = -1;
+
+        int percent = (int)((offset * 100) / total_bytes);
+
+        if(percent > 100)
+            percent = 100;
+
+        if(percent != last_percent)
+        {
+            last_percent = percent;
+
+            if(progress_callback)
+                progress_callback(percent);
+        }
     }
 
     printf(
         "Built %d pages of offsets\n",
         pages_written
     );
-
+    if(progress_callback)
+        progress_callback(100);
 
     printf("before fflush\n");
     fflush(offset_file);
@@ -437,14 +467,11 @@ int ereader_open_book(EReaderBook *book)
         fclose(book_file);
         book_file = NULL;
 
-
         if(!ereader_build_offsets(book))
         {
             printf("Offset build failed\n");
             return 0;
         }
-
-
         /*
          * Re-open book after building
          */
