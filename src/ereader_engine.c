@@ -3,7 +3,7 @@
 #include <string.h>
 #include "ereader_engine.h"
 #include <sys/stat.h>
-
+#include "lvgl.h"
 #define PAGE_SIZE 450
 #define MAX_PAGES 10000
 
@@ -90,35 +90,40 @@ int ereader_build_offsets(EReaderBook *book)
 
     while(1)
     {
+        if (pages_written < 10)
+        {
+            printf("BUILD OFFSET=%ld\n", offset);
+        }
+
         PageResult page =
             render_page_at_offset(offset);
+
+        if (pages_written < 10)
+        {
+            printf(
+                "RENDER RETURN bytes=%zu chars=%zu\n",
+                page.bytes_used,
+                strlen(page.text)
+            );
+        }
 
 
         if(page.bytes_used == 0)
             break;
 
 
-        size_t written =
-            fwrite(
-                &offset,
-                sizeof(long),
-                1,
-                offset_file
-            );
-
-
-        if(written != 1)
-        {
-            printf("OFFSET WRITE FAILED\n");
-            break;
-        }
+        fwrite(
+            &offset,
+            sizeof(long),
+            1,
+            offset_file
+        );
 
 
         pages_written++;
 
         offset += page.bytes_used;
     }
-
 
     printf(
         "Built %d pages of offsets\n",
@@ -263,46 +268,42 @@ static PageResult build_page(const char *raw, size_t bytes_read)
 
     uint32_t r = 0;
     uint32_t w = 0;
-    uint32_t used = 0;
 
-
-    while(raw[r] && r < bytes_read)
+    while(r < bytes_read && raw[r] != '\0')
     {
-        uint32_t word_start = r;
-
-        char word[128];
-        uint32_t word_len = 0;
-
+        /*
+         * Save where this token begins.
+         */
+        uint32_t token_start = r;
 
         /*
-         * Skip spaces/newlines before word
+         * Read leading whitespace.
          */
-        while(raw[r] == ' ' ||
+        char whitespace[64];
+        uint32_t ws_len = 0;
+
+        while(r < bytes_read &&
+             (raw[r] == ' ' ||
               raw[r] == '\n' ||
-              raw[r] == '\r')
+              raw[r] == '\r'))
         {
-            if(w < PAGE_SIZE - 1)
-            {
-                result.text[w++] = raw[r];
-            }
+            if(ws_len < sizeof(whitespace)-1)
+                whitespace[ws_len++] = raw[r];
 
             r++;
-            used++;
         }
 
-
-        if(!raw[r])
+        if(r >= bytes_read || raw[r] == '\0')
             break;
 
 
-
-        word_start = r;
-
-
         /*
-         * Read word WITHOUT committing offset yet
+         * Read word.
          */
-        while(raw[r] &&
+        char word[128];
+        uint32_t word_len = 0;
+
+        while(r < bytes_read &&
               raw[r] != ' ' &&
               raw[r] != '\n' &&
               raw[r] != '\r')
@@ -316,42 +317,69 @@ static PageResult build_page(const char *raw, size_t bytes_read)
         word[word_len] = '\0';
 
 
+        /*
+         * Build candidate page.
+         */
+        char test[PAGE_SIZE + 1];
+        uint32_t test_len = 0;
+
+        memcpy(test, result.text, w);
+        test_len = w;
+
+        if(test_len + ws_len < PAGE_SIZE)
+        {
+            memcpy(
+                &test[test_len],
+                whitespace,
+                ws_len
+            );
+            test_len += ws_len;
+        }
+
+        if(test_len + word_len < PAGE_SIZE)
+        {
+            memcpy(
+                &test[test_len],
+                word,
+                word_len
+            );
+            test_len += word_len;
+        }
+
+        test[test_len] = '\0';
+
 
         /*
-         * Test word
+         * Does entire token fit?
          */
-        char test[PAGE_SIZE];
-
-        memcpy(
-            test,
-            result.text,
-            w
-        );
-
-        memcpy(
-            &test[w],
-            word,
-            word_len
-        );
-
-        test[w + word_len] = '\0';
-
-
-
         if(page_fits_callback &&
            !page_fits_callback(test))
         {
             /*
-             * Do not consume this word.
+             * Entire token belongs to next page.
              */
-            r = word_start;
+            r = token_start;
             break;
         }
 
 
+        /*
+         * Commit whitespace.
+         */
+        if(ws_len)
+        {
+            memcpy(
+                &result.text[w],
+                whitespace,
+                ws_len
+            );
+
+            w += ws_len;
+        }
+
 
         /*
-         * Commit word
+         * Commit word.
          */
         memcpy(
             &result.text[w],
@@ -360,8 +388,6 @@ static PageResult build_page(const char *raw, size_t bytes_read)
         );
 
         w += word_len;
-        used += word_len;
-
 
 
         if(w >= PAGE_SIZE - 2)
@@ -370,7 +396,11 @@ static PageResult build_page(const char *raw, size_t bytes_read)
 
 
     result.text[w] = '\0';
-    result.bytes_used = used;
+
+    /*
+     * r is the exact file position for the next page.
+     */
+    result.bytes_used = r;
 
     return result;
 }

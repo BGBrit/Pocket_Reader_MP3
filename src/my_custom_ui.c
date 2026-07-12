@@ -24,7 +24,22 @@ static lv_group_t *button_group;
 
 static lv_obj_t *key_receiver;
 
+static bool reader_page_fits(const char *text)
+{
+    lv_point_t size;
 
+    lv_text_get_size(
+        &size,
+        text,
+        LV_FONT_DEFAULT,
+        0,
+        0,
+        220,
+        LV_TEXT_FLAG_NONE
+    );
+
+    return size.y <= 250;
+}
 
 // =====================================================
 // Forward declarations
@@ -82,6 +97,9 @@ static void ui_key_handler(lv_event_t *e)
 
             if(key == ' ')
             {
+                ereader_set_page_fits_callback(
+        reader_page_fits
+    );
                 bookshelf_load_books();
                 open_bookshelf();
             }

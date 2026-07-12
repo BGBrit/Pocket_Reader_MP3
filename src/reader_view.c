@@ -4,6 +4,7 @@
 #include "bookshelf/bookshelf.h"
 
 #include <stdio.h>
+#include <string.h>
 
 
 static EReaderBook *active_book = NULL;
@@ -12,23 +13,6 @@ static EReaderBook *active_book = NULL;
 static lv_obj_t *reader_text;
 
 static lv_obj_t *reader_footer;
-
-static bool reader_page_fits(const char *text)
-{
-    lv_point_t size;
-
-    lv_text_get_size(
-        &size,
-        text,
-        LV_FONT_DEFAULT,
-        0,
-        0,
-        220,
-        LV_TEXT_FLAG_NONE
-    );
-
-    return size.y <= 250;
-}
 
 // =====================================================
 // Refresh displayed page
@@ -39,6 +23,29 @@ static void reader_refresh(void)
     PageResult page =
         ereader_get_page();
 
+    printf(
+    "DISPLAY TEXT END=[%s]\n",
+    strlen(page.text) > 50 ?
+       &page.text[strlen(page.text)-50] :
+       page.text
+);
+    lv_point_t size;
+
+lv_text_get_size(
+    &size,
+    page.text,
+    LV_FONT_DEFAULT,
+    0,
+    0,
+    220,
+    LV_TEXT_FLAG_NONE
+);
+
+printf(
+    "TEXT SIZE w=%d h=%d\n",
+    size.x,
+    size.y
+);
 
     lv_label_set_text(
         reader_text,
@@ -77,11 +84,6 @@ void reader_open(EReaderBook *book)
     ereader_open_book(
         active_book
     );
-
-    ereader_set_page_fits_callback(
-        reader_page_fits
-    );
-
 
     lv_obj_clean(
         lv_screen_active()
