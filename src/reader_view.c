@@ -14,14 +14,63 @@ static lv_obj_t *reader_text;
 
 static lv_obj_t *reader_footer;
 
-
+static lv_obj_t *loading_box = NULL;
 static lv_obj_t *offset_bar = NULL;
 static lv_obj_t *offset_label = NULL;
 
+
 static void create_offset_loading_ui(void)
 {
-    offset_label = lv_label_create(
+    /*
+     * Center box
+     */
+    loading_box = lv_obj_create(
         lv_screen_active()
+    );
+
+    lv_obj_set_size(
+        loading_box,
+        210,
+        100
+    );
+
+    lv_obj_center(
+        loading_box
+    );
+
+
+    lv_obj_clear_flag(
+        loading_box,
+        LV_OBJ_FLAG_SCROLLABLE
+    );
+
+
+    lv_obj_set_style_bg_color(
+        loading_box,
+        lv_color_make(230,230,230),
+        0
+    );
+
+
+    lv_obj_set_style_border_width(
+        loading_box,
+        1,
+        0
+    );
+
+
+    lv_obj_set_style_radius(
+        loading_box,
+        8,
+        0
+    );
+
+
+    /*
+     * Text
+     */
+    offset_label = lv_label_create(
+        loading_box
     );
 
     lv_label_set_text(
@@ -31,19 +80,22 @@ static void create_offset_loading_ui(void)
 
     lv_obj_align(
         offset_label,
-        LV_ALIGN_CENTER,
+        LV_ALIGN_TOP_MID,
         0,
-        -30
+        10
     );
 
 
+    /*
+     * Progress bar
+     */
     offset_bar = lv_bar_create(
-        lv_screen_active()
+        loading_box
     );
 
     lv_obj_set_size(
         offset_bar,
-        180,
+        170,
         15
     );
 
@@ -51,7 +103,7 @@ static void create_offset_loading_ui(void)
         offset_bar,
         LV_ALIGN_CENTER,
         0,
-        10
+        15
     );
 
 
