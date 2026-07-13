@@ -277,6 +277,31 @@ void bookshelf_open(void)
         else
             name = books[i].path;
 
+        /*
+        * Display name only (don't modify path)
+        */
+        char display_name[256];
+
+        strncpy(
+            display_name,
+            name,
+            sizeof(display_name) - 1
+        );
+
+        display_name[sizeof(display_name) - 1] = '\0';
+
+
+        char *ext =
+            strrchr(
+                display_name,
+                '.'
+            );
+
+        if(ext &&
+        strcmp(ext, ".txt") == 0)
+        {
+            *ext = '\0';
+        }
 
         if(i == selected_book)
         {
@@ -286,7 +311,7 @@ void bookshelf_open(void)
                 buffer,
                 sizeof(buffer),
                 "> %s",
-                name
+                display_name
             );
 
             lv_label_set_text(
@@ -298,7 +323,7 @@ void bookshelf_open(void)
         {
             lv_label_set_text(
                 label,
-                name
+                display_name
             );
         }
 

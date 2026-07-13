@@ -42,7 +42,7 @@ void home_open(void)
 
     lv_label_set_text(
         title,
-        "POCKET READER"
+        "BEAU POD"
     );
 
 
