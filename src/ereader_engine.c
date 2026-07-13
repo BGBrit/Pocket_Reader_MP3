@@ -86,7 +86,6 @@ int ereader_build_offsets(EReaderBook *book)
     long total_bytes = ftell(build_file);
     rewind(build_file);
 
-
     FILE *offset_file = fopen(book->offset_path, "wb");
 
     if(!offset_file)

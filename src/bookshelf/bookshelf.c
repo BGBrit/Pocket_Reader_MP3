@@ -14,6 +14,8 @@
 #define BOOKS_DIRECTORY \
 "/Users/beaubritain/Desktop/fakemicroSD/books"
 
+#define OFFSETS_DIRECTORY "/Users/beaubritain/Desktop/fakemicroSD/offsets"
+
 #define BOOK_DB_FILE \
 "./books.db"
 
@@ -174,11 +176,24 @@ void bookshelf_load_books(void)
         }
 
 
+        const char *filename =
+            strrchr(
+                books[book_count].path,
+                '/'
+            );
+
+        if(filename)
+            filename++;
+        else
+            filename = books[book_count].path;
+
+
         snprintf(
             books[book_count].offset_path,
             sizeof(books[book_count].offset_path),
-            "%s.offsets",
-            full_path
+            "%s/%s.offsets",
+            OFFSETS_DIRECTORY,
+            filename
         );
 
 
@@ -208,6 +223,12 @@ void bookshelf_load_books(void)
 
 void bookshelf_open(void)
 {
+    #ifdef _WIN32
+        _mkdir(OFFSETS_DIRECTORY);
+    #else
+        mkdir(OFFSETS_DIRECTORY, 0755);
+    #endif
+
     button_group =
         lv_group_get_default();
 
