@@ -18,6 +18,114 @@ static lv_obj_t *loading_box = NULL;
 static lv_obj_t *offset_bar = NULL;
 static lv_obj_t *offset_label = NULL;
 
+static lv_obj_t *reader_bg = NULL;
+static lv_obj_t *reader_text = NULL;
+static lv_obj_t *reader_footer = NULL;
+static lv_obj_t *reader_divider = NULL;
+
+typedef enum
+{
+    READER_MODE_INDOOR,
+    READER_MODE_OUTDOOR,
+    READER_MODE_NIGHT
+
+} ReaderMode;
+static ReaderMode current_reader_mode =
+    READER_MODE_INDOOR;
+
+void reader_apply_mode(void)
+{
+    switch(current_reader_mode)
+    {
+        case READER_MODE_INDOOR:
+
+            lv_obj_set_style_bg_color(
+                reader_bg,
+                lv_color_make(245,240,225),
+                0
+            );
+
+            lv_obj_set_style_text_color(
+                reader_text,
+                lv_color_make(35,35,35),
+                0
+            );
+
+            lv_obj_set_style_bg_color(
+                reader_divider,
+                lv_color_make(170,170,170),
+                0
+            );
+
+            lv_obj_set_style_text_color(
+                reader_footer,
+                lv_color_make(70,70,70),
+                0
+            );
+
+            break;
+
+
+
+        case READER_MODE_OUTDOOR:
+
+            lv_obj_set_style_bg_color(
+                reader_bg,
+                lv_color_white(),
+                0
+            );
+
+            lv_obj_set_style_text_color(
+                reader_text,
+                lv_color_black(),
+                0
+            );
+
+            lv_obj_set_style_bg_color(
+                reader_divider,
+                lv_color_make(80,80,80),
+                0
+            );
+
+            lv_obj_set_style_text_color(
+                reader_footer,
+                lv_color_black(),
+                0
+            );
+
+            break;
+
+
+
+        case READER_MODE_NIGHT:
+
+            lv_obj_set_style_bg_color(
+                reader_bg,
+                lv_color_make(24,24,24),
+                0
+            );
+
+            lv_obj_set_style_text_color(
+                reader_text,
+                lv_color_make(220,220,220),
+                0
+            );
+
+            lv_obj_set_style_bg_color(
+                reader_divider,
+                lv_color_make(90,90,90),
+                0
+            );
+
+            lv_obj_set_style_text_color(
+                reader_footer,
+                lv_color_make(170,170,170),
+                0
+            );
+
+            break;
+    }
+}
 
 static void create_offset_loading_ui(void)
 {
@@ -231,34 +339,34 @@ void reader_open(EReaderBook *book)
 
 
 
-    lv_obj_t *bg =
+    reader_bg =
         lv_obj_create(
             lv_screen_active()
         );
 
 
     lv_obj_set_size(
-        bg,
+        reader_bg,
         240,
         320
     );
 
     lv_obj_clear_flag(
-        bg,
+        reader_bg,
         LV_OBJ_FLAG_SCROLLABLE
     );
 
     lv_obj_set_scrollbar_mode(
-        bg,
+        reader_bg,
         LV_SCROLLBAR_MODE_OFF
     );
 
-    lv_obj_set_style_radius(bg, 0, 0);
+    lv_obj_set_style_radius(reader_bg, 0, 0);
 
-    lv_obj_set_style_border_width(bg, 0, 0);
+    lv_obj_set_style_border_width(reader_bg, 0, 0);
 
     lv_obj_set_style_bg_color(
-        bg,
+        reader_bg,
         lv_color_make(250,248,245),
         0
     );
@@ -266,7 +374,7 @@ void reader_open(EReaderBook *book)
 
 
     reader_text =
-        lv_label_create(bg);
+        lv_label_create(reader_bg);
 
     lv_obj_set_size(
         reader_text,
@@ -291,32 +399,32 @@ void reader_open(EReaderBook *book)
 
 
     reader_footer =
-        lv_label_create(bg);
+        lv_label_create(reader_bg);
 
-    lv_obj_t *divider =
-        lv_obj_create(bg);
+    lv_obj_t *reader_divider =
+        lv_obj_create(reader_bg);
 
     lv_obj_set_size(
-        divider,
+        reader_divider,
         220,
         1
     );
 
     lv_obj_align(
-        divider,
+        reader_divider,
         LV_ALIGN_BOTTOM_MID,
         0,
         -28
     );
 
     lv_obj_set_style_radius(
-        divider,
+        reader_divider,
         0,
         0
     );
 
     lv_obj_set_style_pad_all(
-        divider,
+        reader_divider,
         0,
         0
     );
@@ -328,6 +436,14 @@ void reader_open(EReaderBook *book)
         -8
     );
 
+    /*
+     * Apply current reading mode
+     * after all reader objects exist
+     */
+    //current_reader_mode = READER_MODE_NIGHT;
+    //current_reader_mode = READER_MODE_INDOOR;
+    //current_reader_mode = READER_MODE_OUTDOOR;
+    reader_apply_mode();
 
     reader_refresh();
 }
