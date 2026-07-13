@@ -9,11 +9,6 @@
 
 static EReaderBook *active_book = NULL;
 
-
-static lv_obj_t *reader_text;
-
-static lv_obj_t *reader_footer;
-
 static lv_obj_t *loading_box = NULL;
 static lv_obj_t *offset_bar = NULL;
 static lv_obj_t *offset_label = NULL;
@@ -22,6 +17,12 @@ static lv_obj_t *reader_bg = NULL;
 static lv_obj_t *reader_text = NULL;
 static lv_obj_t *reader_footer = NULL;
 static lv_obj_t *reader_divider = NULL;
+
+static lv_obj_t *mode_popup = NULL;
+static lv_obj_t *mode_title = NULL;
+static lv_obj_t *mode_labels[3];
+
+static int selected_mode = 0;
 
 typedef enum
 {
@@ -32,6 +33,24 @@ typedef enum
 } ReaderMode;
 static ReaderMode current_reader_mode =
     READER_MODE_INDOOR;
+
+
+static const char *reader_mode_name(int mode)
+{
+    switch(mode)
+    {
+        case READER_MODE_INDOOR:
+            return "Indoor";
+
+        case READER_MODE_OUTDOOR:
+            return "Outdoor";
+
+        case READER_MODE_NIGHT:
+            return "Night";
+    }
+
+    return "";
+}
 
 void reader_apply_mode(void)
 {
@@ -124,6 +143,139 @@ void reader_apply_mode(void)
             );
 
             break;
+    }
+}
+
+static void update_reader_mode_menu(void)
+{
+    for(int i = 0; i < 3; i++)
+    {
+        if(i == selected_mode)
+        {
+            char buf[32];
+
+            snprintf(
+                buf,
+                sizeof(buf),
+                "> %s",
+                reader_mode_name(i)
+            );
+
+            lv_label_set_text(
+                mode_labels[i],
+                buf
+            );
+        }
+        else
+        {
+            lv_label_set_text(
+                mode_labels[i],
+                reader_mode_name(i)
+            );
+        }
+    }
+}
+
+static void create_reader_mode_menu(void)
+{
+    mode_popup =
+        lv_obj_create(
+            lv_screen_active()
+        );
+
+
+    lv_obj_set_size(
+        mode_popup,
+        180,
+        150
+    );
+
+
+    lv_obj_center(
+        mode_popup
+    );
+
+
+    lv_obj_clear_flag(
+        mode_popup,
+        LV_OBJ_FLAG_SCROLLABLE
+    );
+
+
+    lv_obj_set_style_bg_color(
+        mode_popup,
+        lv_color_make(220,220,220),
+        0
+    );
+
+
+    lv_obj_set_style_border_width(
+        mode_popup,
+        1,
+        0
+    );
+
+
+    mode_title =
+        lv_label_create(
+            mode_popup
+        );
+
+
+    lv_label_set_text(
+        mode_title,
+        "Reading Mode"
+    );
+
+
+    lv_obj_align(
+        mode_title,
+        LV_ALIGN_TOP_MID,
+        0,
+        10
+    );
+
+
+    for(int i = 0; i < 3; i++)
+    {
+        mode_labels[i] =
+            lv_label_create(
+                mode_popup
+            );
+
+
+        lv_label_set_text(
+            mode_labels[i],
+            reader_mode_name(i)
+        );
+
+
+        lv_obj_align(
+            mode_labels[i],
+            LV_ALIGN_TOP_LEFT,
+            20,
+            40 + (i * 25)
+        );
+    }
+
+
+    selected_mode =
+        current_reader_mode;
+
+
+    update_reader_mode_menu();
+}
+
+
+static void close_reader_mode_menu(void)
+{
+    if(mode_popup)
+    {
+        lv_obj_delete(
+            mode_popup
+        );
+
+        mode_popup = NULL;
     }
 }
 
@@ -456,7 +608,49 @@ void reader_open(EReaderBook *book)
 
 void reader_handle_key(uint32_t key)
 {
+    if(mode_popup)
+    {
+        if(key == LV_KEY_LEFT)
+        {
+            if(selected_mode > 0)
+                selected_mode--;
 
+            update_reader_mode_menu();
+        }
+
+
+        else if(key == LV_KEY_RIGHT)
+        {
+            if(selected_mode < 2)
+                selected_mode++;
+
+            update_reader_mode_menu();
+        }
+
+
+        else if(key == ' ')
+        {
+            current_reader_mode =
+                selected_mode;
+
+            reader_apply_mode();
+
+            close_reader_mode_menu();
+        }
+
+
+        else if(
+            key == LV_KEY_ESC ||
+            key == 'b' ||
+            key == 'B'
+        )
+        {
+            close_reader_mode_menu();
+        }
+
+
+        return;
+    }
     if(key == LV_KEY_RIGHT)
     {
         PageResult page =
@@ -490,6 +684,10 @@ void reader_handle_key(uint32_t key)
         //bookshelf_save_books();
 
         printf("Bookmark saved\n");
+    }
+    else if(key == 's' || key == 'S')
+    {
+        create_reader_mode_menu();
     }
 }
 
