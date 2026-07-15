@@ -43,6 +43,15 @@ typedef enum
 static ReaderMode current_reader_mode =
     READER_MODE_INDOOR;
 
+
+bool reader_has_popup(void)
+{
+    return
+        reader_options_popup ||
+        mode_popup ||
+        jump_page_popup;
+}
+
 static void update_jump_page_label(void)
 {
     char buffer[64];
@@ -111,6 +120,12 @@ static void create_jump_page_menu(void)
         LV_ALIGN_TOP_MID,
         0,
         10
+    );
+
+    lv_obj_set_style_text_color(
+        title,
+        lv_color_make(40, 90, 180),
+        0
     );
 
 
@@ -249,6 +264,11 @@ static void create_reader_options_menu(void)
         10
     );
 
+    lv_obj_set_style_text_color(
+        title,
+        lv_color_make(40, 90, 180),
+        0
+    );
 
     for(int i = 0; i < 2; i++)
     {
@@ -485,6 +505,11 @@ static void create_reader_mode_menu(void)
         10
     );
 
+        lv_obj_set_style_text_color(
+        mode_title,
+        lv_color_make(40, 90, 180),
+        0
+    );
 
     for(int i = 0; i < 3; i++)
     {

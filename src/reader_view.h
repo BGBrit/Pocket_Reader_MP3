@@ -9,5 +9,5 @@ void reader_open(EReaderBook *book);
 void reader_handle_key(uint32_t key);
 
 void reader_close(void);
-
+bool reader_has_popup(void);
 #endif

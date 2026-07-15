@@ -140,23 +140,26 @@ static void ui_key_handler(lv_event_t *e)
             break;
 
         case APP_READER:
-            if(key == 'b' ||
+        if(
+            (key == 'b' ||
             key == 'B' ||
             key == LV_KEY_ESC)
-            {
-                reader_close();
+            &&
+            !reader_has_popup()
+        )
+        {
+            reader_close();
 
-                current_app = APP_BOOKSHELF;
+            current_app = APP_BOOKSHELF;
 
-                bookshelf_open();
-            }
+            bookshelf_open();
+        }
+        else
+        {
+            reader_handle_key(key);
+        }
 
-            else
-            {
-                reader_handle_key(key);
-            }
-
-            break;
+        break;
     }
 }
 
