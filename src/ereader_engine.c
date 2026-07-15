@@ -25,6 +25,28 @@ static lv_obj_t * offset_progress_bar = NULL;
 static lv_obj_t * offset_progress_label = NULL;
 static OffsetProgressCallback progress_callback = NULL;
 
+
+void ereader_jump_to_page(int page)
+{
+    if(page < 0)
+        page = 0;
+
+
+    if(page >= page_count)
+        page = page_count - 1;
+
+
+    current_page = page;
+
+    current_offset =
+        page_offsets[current_page];
+}
+
+int ereader_get_total_pages(void)
+{
+    return page_count;
+}
+
 void ereader_set_offset_progress_callback(
     OffsetProgressCallback callback)
 {

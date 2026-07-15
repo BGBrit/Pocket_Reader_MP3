@@ -5,7 +5,7 @@
 
 #include <stdio.h>
 #include <string.h>
-
+#include <stdlib.h>
 
 static EReaderBook *active_book = NULL;
 
@@ -18,9 +18,18 @@ static lv_obj_t *reader_text = NULL;
 static lv_obj_t *reader_footer = NULL;
 static lv_obj_t *reader_divider = NULL;
 
+static lv_obj_t *reader_options_popup = NULL;
+static lv_obj_t *reader_options_labels[2];
+
+static int selected_reader_option = 0;
+
 static lv_obj_t *mode_popup = NULL;
 static lv_obj_t *mode_title = NULL;
 static lv_obj_t *mode_labels[3];
+static lv_obj_t *jump_page_popup = NULL;
+static lv_obj_t *jump_page_label = NULL;
+
+static int jump_page_selection = 0;
 
 static int selected_mode = 0;
 
@@ -33,6 +42,247 @@ typedef enum
 } ReaderMode;
 static ReaderMode current_reader_mode =
     READER_MODE_INDOOR;
+
+static void update_jump_page_label(void)
+{
+    char buffer[64];
+
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "Page %d / %d",
+        jump_page_selection,
+        ereader_get_total_pages()
+    );
+
+    lv_label_set_text(
+        jump_page_label,
+        buffer
+    );
+}
+
+static void create_jump_page_menu(void)
+{
+    jump_page_popup =
+        lv_obj_create(
+            lv_screen_active()
+        );
+
+
+    lv_obj_set_size(
+        jump_page_popup,
+        190,
+        120
+    );
+
+
+    lv_obj_center(
+        jump_page_popup
+    );
+
+
+    lv_obj_clear_flag(
+        jump_page_popup,
+        LV_OBJ_FLAG_SCROLLABLE
+    );
+
+
+    lv_obj_set_style_bg_color(
+        jump_page_popup,
+        lv_color_make(220,220,220),
+        0
+    );
+
+
+    lv_obj_t *title =
+        lv_label_create(
+            jump_page_popup
+        );
+
+
+    lv_label_set_text(
+        title,
+        "Jump To Page"
+    );
+
+
+    lv_obj_align(
+        title,
+        LV_ALIGN_TOP_MID,
+        0,
+        10
+    );
+
+
+    jump_page_label =
+        lv_label_create(
+            jump_page_popup
+        );
+
+
+    lv_obj_align(
+        jump_page_label,
+        LV_ALIGN_CENTER,
+        0,
+        0
+    );
+
+
+    jump_page_selection =
+    ereader_get_current_page_number();
+
+    update_jump_page_label();
+}
+
+
+static void close_jump_page_menu(void)
+{
+    if(jump_page_popup)
+    {
+        lv_obj_delete(
+            jump_page_popup
+        );
+
+        jump_page_popup = NULL;
+        jump_page_label = NULL;
+    }
+}
+
+static const char *reader_option_name(int option)
+{
+    switch(option)
+    {
+        case 0:
+            return "Reading Mode";
+
+        case 1:
+            return "Jump to Page";
+    }
+
+    return "";
+}
+
+
+static void update_reader_options_menu(void)
+{
+    for(int i = 0; i < 2; i++)
+    {
+        char buffer[32];
+
+
+        if(i == selected_reader_option)
+        {
+            snprintf(
+                buffer,
+                sizeof(buffer),
+                "> %s",
+                reader_option_name(i)
+            );
+        }
+        else
+        {
+            snprintf(
+                buffer,
+                sizeof(buffer),
+                "  %s",
+                reader_option_name(i)
+            );
+        }
+
+
+        lv_label_set_text(
+            reader_options_labels[i],
+            buffer
+        );
+    }
+}
+
+static void create_reader_options_menu(void)
+{
+    reader_options_popup =
+        lv_obj_create(
+            lv_screen_active()
+        );
+
+
+    lv_obj_set_size(
+        reader_options_popup,
+        190,
+        130
+    );
+
+
+    lv_obj_center(
+        reader_options_popup
+    );
+
+
+    lv_obj_clear_flag(
+        reader_options_popup,
+        LV_OBJ_FLAG_SCROLLABLE
+    );
+
+
+    lv_obj_set_style_bg_color(
+        reader_options_popup,
+        lv_color_make(220,220,220),
+        0
+    );
+
+
+    lv_obj_t *title =
+        lv_label_create(
+            reader_options_popup
+        );
+
+
+    lv_label_set_text(
+        title,
+        "Reader Options"
+    );
+
+
+    lv_obj_align(
+        title,
+        LV_ALIGN_TOP_MID,
+        0,
+        10
+    );
+
+
+    for(int i = 0; i < 2; i++)
+    {
+        reader_options_labels[i] =
+            lv_label_create(
+                reader_options_popup
+            );
+
+
+        lv_obj_align(
+            reader_options_labels[i],
+            LV_ALIGN_TOP_LEFT,
+            20,
+            45 + (i * 30)
+        );
+    }
+
+
+    selected_reader_option = 0;
+
+    update_reader_options_menu();
+}
+
+static void close_reader_options_menu(void)
+{
+    if(reader_options_popup)
+    {
+        lv_obj_delete(
+            reader_options_popup
+        );
+
+        reader_options_popup = NULL;
+    }
+}
 
 
 static const char *reader_mode_name(int mode)
@@ -608,6 +858,98 @@ void reader_open(EReaderBook *book)
 
 void reader_handle_key(uint32_t key)
 {
+    if(jump_page_popup)
+    {
+        if(key == LV_KEY_RIGHT)
+        {
+            if(jump_page_selection <
+            ereader_get_total_pages() - 20)
+            {
+                jump_page_selection = jump_page_selection + 20;
+                update_jump_page_label();
+            }
+        }
+
+        else if(key == LV_KEY_LEFT)
+        {
+            if(jump_page_selection - 20 >= 0)
+            {
+                jump_page_selection = jump_page_selection - 20;
+                update_jump_page_label();
+            }
+        }
+
+        else if(key == ' ')
+        {
+            ereader_jump_to_page(
+                jump_page_selection
+            );
+
+            close_jump_page_menu();
+
+            reader_refresh();
+        }
+
+        else if(
+            key == 'b' ||
+            key == 'B' ||
+            key == LV_KEY_ESC
+        )
+        {
+            close_jump_page_menu();
+        }
+
+        return;
+    }
+    if(reader_options_popup)
+    {
+        if(key == LV_KEY_LEFT)
+        {
+            if(selected_reader_option > 0)
+                selected_reader_option--;
+
+            update_reader_options_menu();
+        }
+
+
+        else if(key == LV_KEY_RIGHT)
+        {
+            if(selected_reader_option < 1)
+                selected_reader_option++;
+
+            update_reader_options_menu();
+        }
+
+
+        else if(key == ' ')
+        {
+            if(selected_reader_option == 0)
+            {
+                close_reader_options_menu();
+
+                create_reader_mode_menu();
+            }
+            else if(selected_reader_option == 1)
+            {
+                close_reader_options_menu();
+
+                create_jump_page_menu();
+            }
+        }
+
+
+        else if(
+            key == 'b' ||
+            key == 'B' ||
+            key == LV_KEY_ESC
+        )
+        {
+            close_reader_options_menu();
+        }
+
+
+        return;
+    }
     if(mode_popup)
     {
         if(key == LV_KEY_LEFT)
@@ -687,7 +1029,7 @@ void reader_handle_key(uint32_t key)
     }
     else if(key == 's' || key == 'S')
     {
-        create_reader_mode_menu();
+        create_reader_options_menu();
     }
 }
 

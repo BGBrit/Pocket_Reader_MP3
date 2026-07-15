@@ -46,6 +46,8 @@ typedef struct {
 // ======================
 // Initialization
 // ======================
+void ereader_jump_to_page(int page);
+int ereader_get_total_pages(void);
 
 void ereader_init_book(EReaderBook *book);
 
