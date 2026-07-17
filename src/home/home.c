@@ -1,6 +1,6 @@
 #include "home.h"
 #include "../bookshelf/bookshelf.h"
-
+#include "../assets/wallpaper_test.h"
 static lv_group_t *button_group;
 
 
@@ -33,6 +33,19 @@ void home_open(void)
         lv_screen_active()
     );
 
+    lv_obj_t *bg =
+    lv_image_create(
+        lv_screen_active()
+    );
+
+    lv_image_set_src(
+        bg,
+        &wallpaper_test
+    );
+
+    lv_obj_center(bg);
+
+    lv_obj_move_background(bg);
 
     lv_obj_t *title =
         lv_label_create(
@@ -43,6 +56,18 @@ void home_open(void)
     lv_label_set_text(
         title,
         "BEAU POD"
+    );
+
+    lv_obj_set_style_text_color(
+        title,
+        lv_color_white(),
+        0
+    );
+
+    lv_obj_set_style_text_font(
+        title,
+        &lv_font_montserrat_20,
+        0
     );
 
 

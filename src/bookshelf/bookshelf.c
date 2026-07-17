@@ -7,7 +7,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
-
+#include "../assets/wallpaper_test.h"
 
 #define MAX_BOOKS 256
 
@@ -237,6 +237,27 @@ void bookshelf_open(void)
         lv_screen_active()
     );
 
+    /*
+    * Background image
+    */
+    lv_obj_t *bg =
+        lv_image_create(
+            lv_screen_active()
+        );
+
+    lv_image_set_src(
+        bg,
+        &wallpaper_test
+    );
+
+    lv_obj_center(bg);
+
+    lv_obj_move_background(bg);
+
+    lv_obj_clear_flag(
+        bg,
+        LV_OBJ_FLAG_CLICKABLE
+    );
 
     lv_obj_t *title =
         lv_label_create(
@@ -249,6 +270,17 @@ void bookshelf_open(void)
         "BOOKSHELF"
     );
 
+    lv_obj_set_style_text_color(
+        title,
+        lv_color_white(),
+        0
+    );
+
+    lv_obj_set_style_text_font(
+        title,
+        &lv_font_montserrat_20,
+        0
+    );
 
     lv_obj_align(
         title,
