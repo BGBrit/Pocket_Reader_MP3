@@ -18,6 +18,9 @@ static lv_obj_t *reader_text = NULL;
 static lv_obj_t *reader_footer = NULL;
 static lv_obj_t *reader_divider = NULL;
 
+static lv_obj_t *bookmark_toast = NULL;
+static lv_timer_t *bookmark_timer = NULL;
+
 static lv_obj_t *reader_options_popup = NULL;
 static lv_obj_t *reader_options_labels[2];
 
@@ -43,6 +46,85 @@ typedef enum
 static ReaderMode current_reader_mode =
     READER_MODE_INDOOR;
 
+
+
+static void hide_bookmark_toast(lv_timer_t *timer)
+{
+    if(bookmark_toast)
+    {
+        lv_obj_delete(bookmark_toast);
+        bookmark_toast = NULL;
+    }
+
+    bookmark_timer = NULL;
+}
+
+static void show_bookmark_saved(void)
+{
+    if(bookmark_toast)
+    {
+        lv_obj_delete(bookmark_toast);
+    }
+
+    bookmark_toast =
+        lv_label_create(
+            reader_bg
+        );
+
+    lv_label_set_text(
+        bookmark_toast,
+        "✓ Bookmark Saved"
+    );
+
+    lv_obj_set_style_bg_color(
+        bookmark_toast,
+        lv_color_black(),
+        0
+    );
+
+    lv_obj_set_style_bg_opa(
+        bookmark_toast,
+        LV_OPA_70,
+        0
+    );
+
+    lv_obj_set_style_text_color(
+        bookmark_toast,
+        lv_color_white(),
+        0
+    );
+
+    lv_obj_set_style_pad_all(
+        bookmark_toast,
+        8,
+        0
+    );
+
+    lv_obj_set_style_radius(
+        bookmark_toast,
+        8,
+        0
+    );
+
+    lv_obj_align(
+        bookmark_toast,
+        LV_ALIGN_BOTTOM_MID,
+        0,
+        -45
+    );
+
+    if(bookmark_timer)
+    {
+        lv_timer_delete(bookmark_timer);
+    }
+
+    bookmark_timer =
+        lv_timer_create(
+            hide_bookmark_toast,
+            1000,
+            NULL
+        );
+}
 
 bool reader_has_popup(void)
 {
@@ -1049,7 +1131,7 @@ void reader_handle_key(uint32_t key)
         bookshelf_save_books();
 
         //bookshelf_save_books();
-
+        show_bookmark_saved();
         printf("Bookmark saved\n");
     }
     else if(key == 's' || key == 'S')
