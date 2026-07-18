@@ -7,6 +7,9 @@ extern "C" {
 
 void init_pocket_reader_ui(void);
 
+void ui_open_bookshelf(void);
+void ui_open_audio(void);
+
 #ifdef __cplusplus
 }
 #endif

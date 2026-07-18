@@ -3,7 +3,7 @@
 #include "home/home.h"
 #include "bookshelf/bookshelf.h"
 #include "reader_view.h"
-
+#include "audio/audio.h"
 #include <stdio.h>
 #include <stdint.h>
 
@@ -12,7 +12,8 @@ typedef enum
 {
     APP_HOME,
     APP_BOOKSHELF,
-    APP_READER
+    APP_READER,
+    APP_AUDIO
 
 } AppState;
 
@@ -23,6 +24,28 @@ static AppState current_app = APP_HOME;
 static lv_group_t *button_group;
 
 static lv_obj_t *key_receiver;
+
+
+void ui_open_bookshelf(void)
+{
+    current_app = APP_BOOKSHELF;
+
+    bookshelf_load_books();
+    bookshelf_open();
+
+    lv_group_focus_obj(key_receiver);
+}
+
+
+void ui_open_audio(void)
+{
+    current_app = APP_AUDIO;
+
+    audio_open();
+
+    lv_group_focus_obj(key_receiver);
+}
+
 
 static bool reader_page_fits(const char *text)
 {
@@ -95,18 +118,7 @@ static void ui_key_handler(lv_event_t *e)
 
         case APP_HOME:
 
-            if(key == ' ')
-            {
-                ereader_set_page_fits_callback(
-        reader_page_fits
-    );
-                bookshelf_load_books();
-                open_bookshelf();
-            }
-            else
-            {
-                home_handle_key(key);
-            }
+            home_handle_key(key);
 
             break;
 
@@ -160,6 +172,20 @@ static void ui_key_handler(lv_event_t *e)
         }
 
         break;
+
+        case APP_AUDIO:
+            if(key == 'b' ||
+            key == 'B' ||
+            key == LV_KEY_ESC)
+            {
+                open_home();
+            }
+            else
+            {
+                audio_handle_key(key);
+            }
+
+            break;
     }
 }
 

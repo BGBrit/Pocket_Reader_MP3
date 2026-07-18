@@ -1148,7 +1148,14 @@ void reader_handle_key(uint32_t key)
 
 void reader_close(void)
 {
-    ereader_close_book();
+    if(bookmark_timer)
+    {
+        lv_timer_delete(bookmark_timer);
+        bookmark_timer = NULL;
+    }
+
+    bookmark_toast = NULL;
+        ereader_close_book();
 
     active_book = NULL;
 }
