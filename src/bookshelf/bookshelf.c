@@ -8,7 +8,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include "../assets/wallpaper_test.h"
-
+#include "../common/scroll_list.h"
+#include "../my_custom_ui.h"
 #define MAX_BOOKS 256
 
 #define BOOKS_DIRECTORY \
@@ -221,6 +222,41 @@ void bookshelf_load_books(void)
     );
 }
 
+static const char *bookshelf_get_name(int index)
+{
+    static char name[256];
+
+    const char *file =
+        strrchr(
+            books[index].path,
+            '/'
+        );
+
+    if(file)
+        file++;
+    else
+        file = books[index].path;
+
+
+    snprintf(
+        name,
+        sizeof(name),
+        "%s",
+        file
+    );
+
+
+    char *ext =
+        strrchr(name,'.');
+
+    if(ext)
+        *ext = '\0';
+
+
+    return name;
+}
+
+
 void bookshelf_open(void)
 {
     #ifdef _WIN32
@@ -290,106 +326,20 @@ void bookshelf_open(void)
     );
 
 
-    for(int i = 0; i < book_count; i++)
-    {
+    scroll_list_create("BOOKSHELF");
 
-        lv_obj_t *btn =
-            lv_btn_create(
-                lv_screen_active()
-            );
+    scroll_list_set_count(book_count);
 
+    scroll_list_set_text_callback(
+        bookshelf_get_name
+    );
 
-        lv_obj_set_size(
-            btn,
-            210,
-            35
-        );
+    scroll_list_set_selected(
+        selected_book
+    );
 
 
-        lv_obj_align(
-            btn,
-            LV_ALIGN_TOP_MID,
-            0,
-            60 + (i * 40)
-        );
-
-
-        lv_obj_t *label =
-            lv_label_create(btn);
-
-
-        const char *name =
-            strrchr(
-                books[i].path,
-                '/'
-            );
-
-
-        if(name)
-            name++;
-        else
-            name = books[i].path;
-
-        /*
-        * Display name only (don't modify path)
-        */
-        char display_name[256];
-
-        strncpy(
-            display_name,
-            name,
-            sizeof(display_name) - 1
-        );
-
-        display_name[sizeof(display_name) - 1] = '\0';
-
-
-        char *ext =
-            strrchr(
-                display_name,
-                '.'
-            );
-
-        if(ext &&
-        strcmp(ext, ".txt") == 0)
-        {
-            *ext = '\0';
-        }
-
-        if(i == selected_book)
-        {
-            char buffer[256];
-
-            snprintf(
-                buffer,
-                sizeof(buffer),
-                "> %s",
-                display_name
-            );
-
-            lv_label_set_text(
-                label,
-                buffer
-            );
-        }
-        else
-        {
-            lv_label_set_text(
-                label,
-                display_name
-            );
-        }
-
-
-        lv_obj_center(label);
-
-
-        lv_group_add_obj(
-            button_group,
-            btn
-        );
-    }
-
+    ui_focus_keyboard();
 
     if(book_count > 0)
     {

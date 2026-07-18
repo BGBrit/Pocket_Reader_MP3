@@ -41,6 +41,8 @@ void ui_open_audio(void)
 {
     current_app = APP_AUDIO;
 
+    audio_load_songs();
+
     audio_open();
 
     lv_group_focus_obj(key_receiver);

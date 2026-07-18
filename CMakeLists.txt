@@ -69,7 +69,7 @@ add_compile_definitions($<$<BOOL:${LV_USE_FFMPEG}>:LV_USE_FFMPEG=1>)
 add_subdirectory(lvgl)
 target_include_directories(lvgl PUBLIC ${PROJECT_SOURCE_DIR} ${SDL2_INCLUDE_DIRS})
 
-set(MAIN_SOURCES src/hal/hal.c src/my_custom_ui.c src/ereader_engine.c src/bookshelf/bookshelf.c src/home/home.c src/reader_view.c src/assets/wallpaper_test.c src/audio/audio.c)
+set(MAIN_SOURCES src/hal/hal.c src/my_custom_ui.c src/ereader_engine.c src/bookshelf/bookshelf.c src/home/home.c src/reader_view.c src/assets/wallpaper_test.c src/audio/audio.c src/common/scroll_list.c)
 set(MAIN_LIBS lvgl lvgl::examples lvgl::demos lvgl::thorvg ${SDL2_LIBRARIES})
 
 # Create the main executable, depending on the FreeRTOS option

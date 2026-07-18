@@ -19,7 +19,7 @@ static long page_offsets[MAX_PAGES];
 static int page_count = 0;
 
 static PageResult build_page(const char *raw, size_t bytes_read);
-static PageResult render_page_at_offset(long offset);
+static PageResult render_page_at_offset(FILE *file, long offset);
 
 static lv_obj_t * offset_progress_bar = NULL;
 static lv_obj_t * offset_progress_label = NULL;
@@ -80,17 +80,17 @@ static int file_exists(const char *path)
 // ======================
 // FILE RENDER PIPELINE
 // ======================
-static PageResult render_page_at_offset(long offset)
+static PageResult render_page_at_offset(FILE *file, long offset)
 {
     PageResult result = {0};
 
-    if (!book_file)
+    if (!file)
         return result;
 
-    fseek(book_file, offset, SEEK_SET);
+    fseek(file, offset, SEEK_SET);
 
     char raw[PAGE_SIZE * 2];
-    size_t read = fread(raw, 1, sizeof(raw) - 1, book_file);
+    size_t read = fread(raw, 1, sizeof(raw) - 1, file);
     raw[read] = '\0';
 
     return build_page(raw, read);
@@ -117,7 +117,7 @@ int ereader_build_offsets(EReaderBook *book)
     }
 
 
-    book_file = build_file;
+    //book_file = build_file;
 
 
     long offset = 0;
@@ -132,7 +132,7 @@ int ereader_build_offsets(EReaderBook *book)
         }
 
         PageResult page =
-            render_page_at_offset(offset);
+            render_page_at_offset(build_file, offset);
 
         if (pages_written < 10)
         {
@@ -196,9 +196,35 @@ int ereader_build_offsets(EReaderBook *book)
     book_file = NULL;
 
     printf("returning from build\n");
+    /*printf("screen=%p\n",
+        lv_screen_active()
+    );
+
+    printf("display=%p\n",
+        lv_obj_get_display(
+            lv_screen_active()
+        )
+    );*/
+
+    printf(
+    "AFTER BUILD current_page=%d page_count=%d\n",
+    current_page,
+    page_count
+);
+
+    printf("closing offset done\n");
+
+    fclose(build_file);
+
+    printf("book close done\n");
+
+    book_file = NULL;
+
+    printf("about to return\n");
 
     return 1;
 }
+
 
 int ereader_load_offsets(EReaderBook *book)
 {
@@ -419,6 +445,9 @@ static PageResult build_page(const char *raw, size_t bytes_read)
          */
         if(ws_len)
         {
+            if(w + ws_len >= PAGE_SIZE)
+                break;
+
             memcpy(
                 &result.text[w],
                 whitespace,
@@ -430,8 +459,11 @@ static PageResult build_page(const char *raw, size_t bytes_read)
 
 
         /*
-         * Commit word.
-         */
+        * Commit word.
+        */
+        if(w + word_len >= PAGE_SIZE)
+            break;
+
         memcpy(
             &result.text[w],
             word,
@@ -487,7 +519,7 @@ int ereader_open_book(EReaderBook *book)
 
         fclose(book_file);
         book_file = NULL;
-
+        printf("STEP 1 before build\n");
         if(!ereader_build_offsets(book))
         {
             printf("Offset build failed\n");
@@ -496,12 +528,14 @@ int ereader_open_book(EReaderBook *book)
         /*
          * Re-open book after building
          */
+        printf("STEP 2 after build\n");
         book_file =
             fopen(book->path, "r");
 
 
         if(!book_file)
             return 0;
+
     }
 
 
@@ -571,7 +605,7 @@ PageResult ereader_get_page(void)
     if (!book_file)
         return empty_page();
 
-    PageResult page = render_page_at_offset(current_offset);
+    PageResult page = render_page_at_offset(book_file, current_offset);
 
     return page;
 }
