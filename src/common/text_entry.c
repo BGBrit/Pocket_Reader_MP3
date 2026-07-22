@@ -222,9 +222,8 @@ static void create_text_entry_popup(
     lv_label_set_text(
         help,
         "SPACE add\n"
-        "UP delete\n"
+        "B delete\n"
         "S save\n"
-        "B cancel"
     );
 
 
