@@ -117,12 +117,104 @@ void playlist_storage_load(void)
 
 void playlist_storage_save(void)
 {
-    /*
-     * We will add this after
-     * rename/delete is working.
-     *
-     * Saving individual playlists
-     * is cleaner than rewriting
-     * everything.
-     */
+    DIR *dir =
+        opendir(
+            PLAYLIST_DIRECTORY
+        );
+
+
+    if(dir)
+    {
+        struct dirent *entry;
+
+
+        while((entry = readdir(dir)) != NULL)
+        {
+            if(entry->d_name[0] == '.')
+                continue;
+
+
+            char path[512];
+
+
+            snprintf(
+                path,
+                sizeof(path),
+                "%s/%s",
+                PLAYLIST_DIRECTORY,
+                entry->d_name
+            );
+
+
+            remove(path);
+        }
+
+
+        closedir(dir);
+    }
+
+
+
+    for(int i = 1;
+        i < playlist_get_count();
+        i++)
+    {
+        Playlist *p =
+            playlist_get(i);
+
+
+        if(!p)
+            continue;
+
+
+        char path[512];
+
+
+        snprintf(
+            path,
+            sizeof(path),
+            "%s/%s.txt",
+            PLAYLIST_DIRECTORY,
+            p->name
+        );
+
+
+        FILE *fp =
+            fopen(
+                path,
+                "w"
+            );
+
+
+        if(!fp)
+        {
+            printf(
+                "Could not save playlist %s\n",
+                p->name
+            );
+
+            continue;
+        }
+
+
+        for(int s = 0;
+            s < p->song_count;
+            s++)
+        {
+            fprintf(
+                fp,
+                "%d\n",
+                p->song_indices[s]
+            );
+        }
+
+
+        fclose(fp);
+
+
+        printf(
+            "Saved playlist: %s\n",
+            p->name
+        );
+    }
 }

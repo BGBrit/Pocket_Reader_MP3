@@ -5,17 +5,18 @@
 #include "../common/scroll_list.h"
 
 #include "audio_library.h"
-
+#include "../common/text_entry.h"
 #include "playlist.h"
 #include "playlist_storage.h"
 #include "lvgl/lvgl.h"
 
 #include <stdio.h>
 #include <string.h>
-
+static int editing_playlist_index = -1;
 static lv_obj_t *playlist_options_popup = NULL;
 static lv_obj_t *playlist_menu_popup = NULL;
 static lv_obj_t *now_playing_popup = NULL;
+
 
 static lv_obj_t *playlist_options_labels[2];
 static lv_obj_t *playlist_menu_labels[4];
@@ -40,6 +41,64 @@ static int selected_song = 0;
 static int current_playlist = 0;
 
 
+static void create_playlist_finished(
+    const char *name
+)
+{
+    if(strlen(name) == 0)
+        return;
+
+
+    playlist_create(
+        name
+    );
+
+
+    playlist_storage_save();
+
+
+    audio_open();
+
+
+    printf(
+        "Created playlist: %s\n",
+        name
+    );
+}
+
+
+static void rename_playlist_finished(
+    const char *name
+)
+{
+    if(editing_playlist_index <= 0)
+        return;
+
+
+    if(strlen(name) == 0)
+        return;
+
+
+    playlist_rename(
+        editing_playlist_index,
+        name
+    );
+
+
+    playlist_storage_save();
+
+
+    audio_open();
+
+
+    editing_playlist_index = -1;
+
+
+    printf(
+        "Renamed playlist: %s\n",
+        name
+    );
+}
 
 static void update_playlist_options_menu(void)
 {
@@ -524,9 +583,11 @@ void audio_handle_key(
             {
                 close_playlist_options_menu();
 
-                playlist_create("New Playlist");
-
-                open_playlists();
+                text_entry_open(
+                "Create Playlist",
+                "",
+                create_playlist_finished
+                );
             }
             else
             {
@@ -567,8 +628,31 @@ void audio_handle_key(
             switch(selected_playlist_menu)
             {
                 case 0:
-                    printf("Rename Playlist\n");
+                {
+                    Playlist *p =
+                        playlist_get(
+                            current_playlist
+                        );
+
+
+                    if(p && current_playlist > 0)
+                    {
+                        editing_playlist_index =
+                            current_playlist;
+
+
+                        close_playlist_menu();
+
+
+                        text_entry_open(
+                            "Rename Playlist",
+                            p->name,
+                            rename_playlist_finished
+                        );
+                    }
+
                     break;
+                }
 
                 case 1:
                     printf("Remove Songs\n");
@@ -579,8 +663,25 @@ void audio_handle_key(
                     break;
 
                 case 3:
-                    printf("Delete Playlist\n");
+                {
+                    if(current_playlist > 0)
+                    {
+                        playlist_delete(
+                            current_playlist
+                        );
+
+
+                        playlist_storage_save();
+
+
+                        close_playlist_menu();
+
+
+                        open_playlists();
+                    }
+
                     break;
+                }
             }
 
             close_playlist_menu();

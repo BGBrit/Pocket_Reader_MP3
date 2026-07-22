@@ -6,6 +6,7 @@
 #include "audio/audio.h"
 #include <stdio.h>
 #include <stdint.h>
+#include "common/text_entry.h"
 
 
 typedef enum
@@ -124,6 +125,11 @@ static void ui_key_handler(lv_event_t *e)
 
     printf("UI KEY: %d\n", key);
 
+    if(text_entry_is_open())
+    {
+        text_entry_handle_key(key);
+        return;
+    }
 
 
     switch(current_app)
