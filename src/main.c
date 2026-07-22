@@ -23,7 +23,7 @@
 #include "lvgl/examples/lv_examples.h"
 #include "lvgl/demos/lv_demos.h"
 #include <SDL.h>
-
+#include "audio/playlist.h"
 #include "hal/hal.h"
 
 /*********************
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 
   /*Initialize LVGL*/
   lv_init();
-
+  playlist_init();
   /* STEP 2: Change screen bounds from (320, 480) to (240, 320) portrait */
   sdl_hal_init(240, 320);
 

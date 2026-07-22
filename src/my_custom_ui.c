@@ -39,15 +39,26 @@ void ui_open_bookshelf(void)
 
 void ui_open_audio(void)
 {
+    static int initialized = 0;
+
+
     current_app = APP_AUDIO;
 
-    audio_load_songs();
+
+    if(!initialized)
+    {
+        audio_init();
+        initialized = 1;
+    }
+
 
     audio_open();
 
-    lv_group_focus_obj(key_receiver);
-}
 
+    lv_group_focus_obj(
+        key_receiver
+    );
+}
 
 static bool reader_page_fits(const char *text)
 {
