@@ -92,7 +92,7 @@ static void create_key_receiver(void);
 // App switching
 // =====================================================
 
-static void open_home(void)
+void open_home(void)
 {
     current_app = APP_HOME;
 
@@ -193,18 +193,10 @@ static void ui_key_handler(lv_event_t *e)
         break;
 
         case APP_AUDIO:
-            if(key == 'b' ||
-            key == 'B' ||
-            key == LV_KEY_ESC)
-            {
-                open_home();
-            }
-            else
-            {
-                audio_handle_key(key);
-            }
-
+        {
+            audio_handle_key(key);
             break;
+        }
     }
 }
 

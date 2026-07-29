@@ -1,5 +1,5 @@
 #include "audio.h"
-
+#include "now_playing.h"
 #include "../my_custom_ui.h"
 
 #include "../common/scroll_list.h"
@@ -559,34 +559,35 @@ void audio_handle_key(
     );
 
 
+    /*
+     * Text entry / popups own the keyboard.
+     */
     if(playlist_options_popup)
     {
-        if(key==LV_KEY_LEFT)
+        if(key == LV_KEY_LEFT)
         {
-            if(selected_playlist_option>0)
+            if(selected_playlist_option > 0)
                 selected_playlist_option--;
 
             update_playlist_options_menu();
         }
-
-        else if(key==LV_KEY_RIGHT)
+        else if(key == LV_KEY_RIGHT)
         {
-            if(selected_playlist_option<1)
+            if(selected_playlist_option < 1)
                 selected_playlist_option++;
 
             update_playlist_options_menu();
         }
-
-        else if(key==' ')
+        else if(key == ' ')
         {
-            if(selected_playlist_option==0)
+            if(selected_playlist_option == 0)
             {
                 close_playlist_options_menu();
 
                 text_entry_open(
-                "Create Playlist",
-                "",
-                create_playlist_finished
+                    "Create Playlist",
+                    "",
+                    create_playlist_finished
                 );
             }
             else
@@ -594,17 +595,18 @@ void audio_handle_key(
                 close_playlist_options_menu();
             }
         }
-
         else if(
-            key=='b' ||
-            key=='B' ||
-            key==LV_KEY_ESC)
+            key == 'b' ||
+            key == 'B' ||
+            key == LV_KEY_ESC)
         {
             close_playlist_options_menu();
         }
 
         return;
     }
+
+
     if(playlist_menu_popup)
     {
         if(key == LV_KEY_LEFT)
@@ -634,15 +636,12 @@ void audio_handle_key(
                             current_playlist
                         );
 
-
                     if(p && current_playlist > 0)
                     {
                         editing_playlist_index =
                             current_playlist;
 
-
                         close_playlist_menu();
-
 
                         text_entry_open(
                             "Rename Playlist",
@@ -670,12 +669,9 @@ void audio_handle_key(
                             current_playlist
                         );
 
-
                         playlist_storage_save();
 
-
                         close_playlist_menu();
-
 
                         open_playlists();
                     }
@@ -687,19 +683,72 @@ void audio_handle_key(
             close_playlist_menu();
         }
 
-        else if(key == 'b' ||
-                key == 'B' ||
-                key == LV_KEY_ESC)
+        else if(
+            key == 'b' ||
+            key == 'B' ||
+            key == LV_KEY_ESC)
         {
             close_playlist_menu();
         }
 
         return;
     }
+
+
+    /*
+     * Now Playing owns its own controls.
+     */
+    if(current_page == AUDIO_NOW_PLAYING)
+    {
+        if(now_playing_handle_key(key))
+        {
+            now_playing_close();
+
+            open_playlist_view();
+
+            current_page =
+                AUDIO_PLAYLIST_VIEW;
+        }
+
+        return;
+    }
+
+
+    /*
+     * Back navigation
+     */
+    if(key == 'b' ||
+       key == 'B' ||
+       key == LV_KEY_ESC)
+    {
+        switch(current_page)
+        {
+            case AUDIO_PLAYLIST_VIEW:
+
+                open_playlists();
+
+                return;
+
+            case AUDIO_PLAYLISTS:
+
+                open_home();
+
+                return;
+
+            default:
+
+                return;
+        }
+    }
+
+
+    /*
+     * Options
+     */
     if(key == 's' ||
        key == 'S')
-        {
-            if(current_page == AUDIO_PLAYLISTS)
+    {
+        if(current_page == AUDIO_PLAYLISTS)
         {
             create_playlist_options_menu();
         }
@@ -712,35 +761,33 @@ void audio_handle_key(
     }
 
 
-
+    /*
+     * Select
+     */
     if(key == ' ')
     {
         if(current_page == AUDIO_PLAYLISTS)
         {
             open_playlist_view();
         }
-
-
-        else if(current_page == AUDIO_PLAYLIST_OPTIONS)
-        {
-            create_playlist();
-        }
-
-
         else if(current_page == AUDIO_PLAYLIST_VIEW)
         {
-            printf(
-                "Open Now Playing song %d\n",
+            now_playing_open(
+                current_playlist,
                 selected_song
             );
-        }
 
+            current_page =
+                AUDIO_NOW_PLAYING;
+        }
 
         return;
     }
 
 
-
+    /*
+     * Down / Right
+     */
     if(key == LV_KEY_DOWN ||
        key == LV_KEY_RIGHT)
     {
@@ -751,20 +798,16 @@ void audio_handle_key(
             if(selected_playlist >= playlist_get_count())
                 selected_playlist = 0;
 
-
             scroll_list_set_selected(
                 selected_playlist
             );
         }
-
-
         else if(current_page == AUDIO_PLAYLIST_VIEW)
         {
             Playlist *p =
                 playlist_get(
                     current_playlist
                 );
-
 
             if(p)
             {
@@ -773,27 +816,19 @@ void audio_handle_key(
                 if(selected_song >= p->song_count)
                     selected_song = 0;
 
-
                 scroll_list_set_selected(
                     selected_song
                 );
             }
         }
-        else if(current_page == AUDIO_PLAYLIST_OPTIONS)
-        {
-            selected_option = 0;
-
-            scroll_list_set_selected(
-                selected_option
-            );
-        }
-
 
         return;
     }
 
 
-
+    /*
+     * Up / Left
+     */
     if(key == LV_KEY_UP ||
        key == LV_KEY_LEFT)
     {
@@ -805,20 +840,16 @@ void audio_handle_key(
                 selected_playlist =
                     playlist_get_count() - 1;
 
-
             scroll_list_set_selected(
                 selected_playlist
             );
         }
-
-
         else if(current_page == AUDIO_PLAYLIST_VIEW)
         {
             Playlist *p =
                 playlist_get(
                     current_playlist
                 );
-
 
             if(p)
             {
@@ -828,26 +859,12 @@ void audio_handle_key(
                     selected_song =
                         p->song_count - 1;
 
-
                 scroll_list_set_selected(
                     selected_song
                 );
             }
         }
 
-
         return;
-    }
-
-
-
-    if(key == LV_KEY_ESC ||
-       key == 'b' ||
-       key == 'B')
-    {
-        if(current_page == AUDIO_PLAYLIST_VIEW)
-        {
-            open_playlists();
-        }
     }
 }
