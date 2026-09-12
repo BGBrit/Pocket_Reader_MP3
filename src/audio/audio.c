@@ -15,6 +15,7 @@
 
 static int current_playlist;
 static int selected_song;
+static int removing_songs = 0;
 
 static int editing_playlist_index = -1;
 static lv_obj_t *playlist_options_popup = NULL;
@@ -548,6 +549,74 @@ static void open_playlist_options(void)
 }
 
 
+static void open_remove_songs(void)
+{
+    Playlist *p =
+        playlist_get(
+            current_playlist
+        );
+
+    if(!p)
+        return;
+
+
+    /*
+     * All Songs cannot have songs removed.
+     */
+    if(current_playlist <= 0)
+        return;
+
+
+    removing_songs = 1;
+
+
+    /*
+     * Keep the current selection valid.
+     */
+    if(p->song_count == 0)
+    {
+        selected_song = 0;
+    }
+    else if(selected_song >= p->song_count)
+    {
+        selected_song =
+            p->song_count - 1;
+    }
+
+
+    scroll_list_create(
+        "REMOVE SONGS"
+    );
+
+
+    scroll_list_set_count(
+        p->song_count
+    );
+
+
+    scroll_list_set_text_callback(
+        playlist_song_name_callback
+    );
+
+
+    scroll_list_set_selected(
+        selected_song
+    );
+
+
+    ui_focus_keyboard();
+}
+
+
+static void close_remove_songs(void)
+{
+    removing_songs = 0;
+
+
+    open_playlist_view();
+}
+
+
 void audio_handle_key(
     uint32_t key
 )
@@ -557,7 +626,142 @@ void audio_handle_key(
         key
     );
 
+    /*
+    * Remove Songs screen owns the keyboard.
+    */
+    if(removing_songs)
+    {
+        Playlist *p =
+            playlist_get(
+                current_playlist
+            );
 
+
+        if(!p)
+        {
+            removing_songs = 0;
+            return;
+        }
+
+
+        /*
+        * Back returns to the playlist.
+        */
+        if(key == 'b' ||
+        key == 'B' ||
+        key == LV_KEY_ESC)
+        {
+            close_remove_songs();
+            return;
+        }
+
+
+        /*
+        * Down / Right
+        */
+        if(key == LV_KEY_DOWN ||
+        key == LV_KEY_RIGHT)
+        {
+            if(p->song_count > 0)
+            {
+                selected_song++;
+
+                if(selected_song >= p->song_count)
+                    selected_song = 0;
+
+
+                scroll_list_set_selected(
+                    selected_song
+                );
+            }
+
+            return;
+        }
+
+
+        /*
+        * Up / Left
+        */
+        if(key == LV_KEY_UP ||
+        key == LV_KEY_LEFT)
+        {
+            if(p->song_count > 0)
+            {
+                selected_song--;
+
+                if(selected_song < 0)
+                    selected_song =
+                        p->song_count - 1;
+
+
+                scroll_list_set_selected(
+                    selected_song
+                );
+            }
+
+            return;
+        }
+
+
+        /*
+        * Space removes the selected song.
+        */
+        if(key == ' ')
+        {
+            if(p->song_count > 0 &&
+            selected_song >= 0 &&
+            selected_song < p->song_count)
+            {
+                int song_index =
+                    p->song_indices[selected_song];
+
+
+                printf(
+                    "Removing '%s' from playlist '%s'\n",
+                    audio_library_get_name(song_index),
+                    p->name
+                );
+
+
+                playlist_remove_song(
+                    current_playlist,
+                    song_index
+                );
+
+
+                playlist_storage_save();
+
+
+                /*
+                * Keep selection valid after removal.
+                */
+                if(p->song_count == 0)
+                {
+                    selected_song = 0;
+                }
+                else if(selected_song >= p->song_count)
+                {
+                    selected_song =
+                        p->song_count - 1;
+                }
+
+
+                scroll_list_set_count(
+                    p->song_count
+                );
+
+
+                scroll_list_set_selected(
+                    selected_song
+                );
+            }
+
+            return;
+        }
+
+
+        return;
+    }
     /*
      * Text entry / popups own the keyboard.
      */
@@ -653,7 +857,12 @@ void audio_handle_key(
                 }
 
                 case 1:
-                    printf("Remove Songs\n");
+                    if(current_playlist > 0)
+                    {
+                        close_playlist_menu();
+
+                        open_remove_songs();
+                    }
                     break;
 
                 case 2:
@@ -771,6 +980,12 @@ void audio_handle_key(
         }
         else if(current_page == AUDIO_PLAYLIST_VIEW)
         {
+            audio_state.current_playlist =
+                current_playlist;
+
+            audio_state.current_song =
+                selected_song;
+
             now_playing_open(
                 audio_state.current_playlist,
                 audio_state.current_song
@@ -808,15 +1023,15 @@ void audio_handle_key(
                     current_playlist
                 );
 
-            if(p)
+            if(p && p->song_count > 0)
             {
-                audio_state.current_song++;
+                selected_song++;
 
                 if(selected_song >= p->song_count)
                     selected_song = 0;
 
                 scroll_list_set_selected(
-                    audio_state.current_song
+                    selected_song
                 );
             }
         }
@@ -850,7 +1065,7 @@ void audio_handle_key(
                     current_playlist
                 );
 
-            if(p)
+            if(p && p->song_count > 0)
             {
                 selected_song--;
 
