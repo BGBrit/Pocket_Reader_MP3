@@ -2,7 +2,7 @@
 
 #include "audio_library.h"
 #include "playlist.h"
-
+#include "playlist_storage.h"
 #include "../assets/wallpaper_test.h"
 
 #include "lvgl/lvgl.h"
@@ -1454,6 +1454,7 @@ int now_playing_handle_key(
                             ),
                             destination->name
                         );
+                        playlist_storage_save();
                     }
                     else
                     {

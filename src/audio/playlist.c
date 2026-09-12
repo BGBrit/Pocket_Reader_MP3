@@ -127,43 +127,9 @@ int playlist_create(
         PLAYLIST_NAME_SIZE - 1
     );
 
-
-    /*
-     * Create empty playlist file
-     */
-    char path[512];
-
-    snprintf(
-        path,
-        sizeof(path),
-        "%s/%s.txt",
-        PLAYLIST_DIRECTORY,
-        name
-    );
-
-
-    FILE *fp =
-        fopen(
-            path,
-            "w"
-        );
-
-
-    if(fp)
-    {
-        fclose(fp);
-
-        printf(
-            "Created playlist file: %s\n",
-            path
-        );
-    }
-    else
-    {
-        printf(
-            "Failed creating playlist file\n"
-        );
-    }
+    p->name[
+        PLAYLIST_NAME_SIZE - 1
+    ] = '\0';
 
 
     playlist_count++;
@@ -177,7 +143,6 @@ int playlist_create(
 
     return playlist_count - 1;
 }
-
 
 
 void playlist_delete(
