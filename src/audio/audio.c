@@ -1,7 +1,7 @@
 #include "audio.h"
 #include "now_playing.h"
 #include "../my_custom_ui.h"
-
+#include "audio_state.h"
 #include "../common/scroll_list.h"
 
 #include "audio_library.h"
@@ -12,6 +12,10 @@
 
 #include <stdio.h>
 #include <string.h>
+
+static int current_playlist;
+static int selected_song;
+
 static int editing_playlist_index = -1;
 static lv_obj_t *playlist_options_popup = NULL;
 static lv_obj_t *playlist_menu_popup = NULL;
@@ -34,11 +38,6 @@ static AudioPage current_page =
 static int selected_playlist = 0;
 
 
-static int selected_song = 0;
-
-
-
-static int current_playlist = 0;
 
 
 static void create_playlist_finished(
@@ -773,8 +772,8 @@ void audio_handle_key(
         else if(current_page == AUDIO_PLAYLIST_VIEW)
         {
             now_playing_open(
-                current_playlist,
-                selected_song
+                audio_state.current_playlist,
+                audio_state.current_song
             );
 
             current_page =
@@ -811,13 +810,13 @@ void audio_handle_key(
 
             if(p)
             {
-                selected_song++;
+                audio_state.current_song++;
 
                 if(selected_song >= p->song_count)
                     selected_song = 0;
 
                 scroll_list_set_selected(
-                    selected_song
+                    audio_state.current_song
                 );
             }
         }
