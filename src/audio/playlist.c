@@ -241,22 +241,50 @@ void playlist_add_song(
     }
 
 
+    /*
+     * All Songs is built internally and should
+     * not receive duplicate songs either.
+     */
+
     Playlist *p =
         &playlists[playlist_index];
 
 
     if(p->song_count >= MAX_PLAYLIST_SONGS)
+    {
         return;
+    }
 
 
+    /*
+     * Prevent duplicate songs.
+     */
+
+    for(int i = 0;
+        i < p->song_count;
+        i++)
+    {
+        if(p->song_indices[i] == song_index)
+        {
+            printf(
+                "Song already in playlist: %d\n",
+                song_index
+            );
+
+            return;
+        }
+    }
+
+
+    /*
+     * Add song.
+     */
 
     p->song_indices[p->song_count] =
         song_index;
 
-
     p->song_count++;
 }
-
 
 
 void playlist_remove_song(

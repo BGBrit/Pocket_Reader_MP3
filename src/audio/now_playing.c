@@ -17,6 +17,19 @@
 
 #define SONG_DURATION_SECONDS 210
 
+/*
+ * Add to Playlist popup
+ */
+
+static lv_obj_t *add_to_playlist_popup = NULL;
+
+static lv_obj_t *add_to_playlist_labels[
+    MAX_PLAYLISTS - 1
+];
+
+static int add_to_playlist_count = 0;
+
+static int selected_add_to_playlist = 0;
 
 /*
  * Playback state
@@ -95,6 +108,12 @@ static void update_playback_mode_menu(void);
 static void create_playback_mode_menu(void);
 
 static void close_playback_mode_menu(void);
+
+static void update_add_to_playlist_menu(void);
+
+static void create_add_to_playlist_menu(void);
+
+static void close_add_to_playlist_menu(void);
 
 static void advance_to_next_song(void);
 
@@ -1027,8 +1046,253 @@ static void close_playback_mode_menu(void)
         playback_mode_popup =
             NULL;
     }
+    if(add_to_playlist_popup)
+    {
+        lv_obj_delete(
+            add_to_playlist_popup
+        );
+
+        add_to_playlist_popup =
+            NULL;
+    }
 }
 
+/*
+ * Update Add to Playlist menu.
+ */
+
+static void update_add_to_playlist_menu(void)
+{
+    for(int i = 0;
+        i < add_to_playlist_count;
+        i++)
+    {
+        /*
+         * Playlist index is i + 1 because
+         * index 0 is All Songs.
+         */
+
+        Playlist *p =
+            playlist_get(i + 1);
+
+
+        if(!p)
+            continue;
+
+
+        if(i == selected_add_to_playlist)
+        {
+            lv_label_set_text_fmt(
+                add_to_playlist_labels[i],
+                "> %s",
+                p->name
+            );
+        }
+        else
+        {
+            lv_label_set_text(
+                add_to_playlist_labels[i],
+                p->name
+            );
+        }
+    }
+
+
+    /*
+     * Keep the selected item visible.
+     */
+
+    if(add_to_playlist_count > 0)
+    {
+        lv_obj_scroll_to_view(
+            add_to_playlist_labels[
+                selected_add_to_playlist
+            ],
+            LV_ANIM_OFF
+        );
+    }
+}
+
+
+/*
+ * Create Add to Playlist menu.
+ */
+
+static void create_add_to_playlist_menu(void)
+{
+    int playlist_count =
+        playlist_get_count();
+
+
+    /*
+     * All Songs is index 0, so only
+     * playlists after it are selectable.
+     */
+
+    add_to_playlist_count =
+        playlist_count - 1;
+
+
+    if(add_to_playlist_count <= 0)
+    {
+        printf(
+            "No user playlists available\n"
+        );
+
+        return;
+    }
+
+
+    add_to_playlist_popup =
+        lv_obj_create(
+            lv_screen_active()
+        );
+
+
+    /*
+     * Keep the popup a reasonable size even
+     * if many playlists exist.
+     */
+
+    int popup_height =
+        80 + (add_to_playlist_count * 30);
+
+
+    if(popup_height > 260)
+    {
+        popup_height = 260;
+    }
+
+
+    lv_obj_set_size(
+        add_to_playlist_popup,
+        210,
+        popup_height
+    );
+
+
+    lv_obj_center(
+        add_to_playlist_popup
+    );
+
+
+    /*
+     * Allow scrolling when there are many
+     * playlists.
+     */
+
+    if(add_to_playlist_count > 6)
+    {
+        lv_obj_add_flag(
+            add_to_playlist_popup,
+            LV_OBJ_FLAG_SCROLLABLE
+        );
+    }
+    else
+    {
+        lv_obj_clear_flag(
+            add_to_playlist_popup,
+            LV_OBJ_FLAG_SCROLLABLE
+        );
+    }
+
+
+    lv_obj_set_style_bg_color(
+        add_to_playlist_popup,
+        lv_color_make(
+            220,
+            220,
+            220
+        ),
+        0
+    );
+
+
+    /*
+     * Title.
+     */
+
+    lv_obj_t *title =
+        lv_label_create(
+            add_to_playlist_popup
+        );
+
+
+    lv_label_set_text(
+        title,
+        "Add to Playlist"
+    );
+
+
+    lv_obj_align(
+        title,
+        LV_ALIGN_TOP_MID,
+        0,
+        10
+    );
+
+
+    lv_obj_set_style_text_color(
+        title,
+        lv_color_make(
+            40,
+            90,
+            180
+        ),
+        0
+    );
+
+
+    /*
+     * Create playlist labels.
+     */
+
+    for(int i = 0;
+        i < add_to_playlist_count;
+        i++)
+    {
+        add_to_playlist_labels[i] =
+            lv_label_create(
+                add_to_playlist_popup
+            );
+
+
+        lv_obj_align(
+            add_to_playlist_labels[i],
+            LV_ALIGN_TOP_LEFT,
+            20,
+            45 + (i * 30)
+        );
+    }
+
+
+    selected_add_to_playlist = 0;
+
+
+    update_add_to_playlist_menu();
+}
+
+
+/*
+ * Close Add to Playlist menu.
+ */
+
+static void close_add_to_playlist_menu(void)
+{
+    if(add_to_playlist_popup)
+    {
+        lv_obj_delete(
+            add_to_playlist_popup
+        );
+
+        add_to_playlist_popup = NULL;
+    }
+
+
+    add_to_playlist_count = 0;
+
+    selected_add_to_playlist = 0;
+}
 
 /*
  * Is Now Playing open?
@@ -1090,6 +1354,140 @@ int now_playing_handle_key(
     uint32_t key
 )
 {
+
+    /*
+    * Add to Playlist popup.
+    */
+
+    if(add_to_playlist_popup)
+    {
+        if(key == LV_KEY_LEFT ||
+        key == LV_KEY_UP)
+        {
+            if(selected_add_to_playlist > 0)
+            {
+                selected_add_to_playlist--;
+
+                update_add_to_playlist_menu();
+            }
+
+            return 0;
+        }
+
+
+        if(key == LV_KEY_RIGHT ||
+        key == LV_KEY_DOWN)
+        {
+            if(selected_add_to_playlist <
+            add_to_playlist_count - 1)
+            {
+                selected_add_to_playlist++;
+
+                update_add_to_playlist_menu();
+            }
+
+            return 0;
+        }
+
+
+        /*
+        * Space = add current song.
+        */
+
+        if(key == ' ')
+        {
+            /*
+            * Convert the popup selection back
+            * to the actual playlist index.
+            */
+
+            int playlist_index =
+                selected_add_to_playlist + 1;
+
+
+            /*
+            * Get the currently playing playlist.
+            */
+
+            Playlist *current_playlist =
+                playlist_get(
+                    audio_state.current_playlist
+                );
+
+
+            if(current_playlist &&
+            audio_state.current_song >= 0 &&
+            audio_state.current_song <
+                current_playlist->song_count)
+            {
+                int song_index =
+                    current_playlist->song_indices[
+                        audio_state.current_song
+                    ];
+
+
+                Playlist *destination =
+                    playlist_get(
+                        playlist_index
+                    );
+
+
+                if(destination)
+                {
+                    int old_count =
+                        destination->song_count;
+
+
+                    playlist_add_song(
+                        playlist_index,
+                        song_index
+                    );
+
+
+                    if(destination->song_count >
+                    old_count)
+                    {
+                        printf(
+                            "Added '%s' to playlist '%s'\n",
+                            audio_library_get_name(
+                                song_index
+                            ),
+                            destination->name
+                        );
+                    }
+                    else
+                    {
+                        printf(
+                            "Song already in playlist '%s'\n",
+                            destination->name
+                        );
+                    }
+                }
+            }
+
+
+            close_add_to_playlist_menu();
+
+            return 0;
+        }
+
+
+        /*
+        * Back = close popup.
+        */
+
+        if(key == 'b' ||
+        key == 'B' ||
+        key == LV_KEY_ESC)
+        {
+            close_add_to_playlist_menu();
+
+            return 0;
+        }
+
+
+        return 0;
+    }
     /*
      * Playback Mode popup.
      */
@@ -1190,16 +1588,9 @@ int now_playing_handle_key(
         {
             if(selected_now_playing_option == 0)
             {
-                /*
-                 * Add to Playlist will be
-                 * implemented next.
-                 */
-
                 close_now_playing_options_menu();
 
-                printf(
-                    "Add to Playlist selected\n"
-                );
+                create_add_to_playlist_menu();
             }
             else
             {
