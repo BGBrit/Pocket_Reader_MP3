@@ -135,6 +135,17 @@ void now_playing_open(
     audio_state.current_song =
         song_index;
 
+    if(audio_state.mode == PLAYBACK_SHUFFLE)
+    {
+        Playlist *p =
+            playlist_get(playlist_index);
+
+        if(p && p->song_count > 1)
+        {
+            select_random_song(p);
+        }
+    }
+
     elapsed_seconds = 0;
 
     audio_state.playing = 1;

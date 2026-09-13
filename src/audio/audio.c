@@ -866,9 +866,40 @@ void audio_handle_key(
                     break;
 
                 case 2:
-                    printf("Shuffle Playlist\n");
-                    break;
+                {
+                    Playlist *p =
+                        playlist_get(
+                            current_playlist
+                        );
 
+                    if(p && p->song_count > 0)
+                    {
+                        /*
+                        * Enable shuffle mode.
+                        */
+                        audio_state.mode =
+                            PLAYBACK_SHUFFLE;
+
+                        /*
+                        * Start from the first song.
+                        * now_playing_open() will use the
+                        * existing select_random_song()
+                        * to choose a random song.
+                        */
+                        audio_state.current_song = 0;
+
+                        close_playlist_menu();
+
+                        now_playing_open(
+                            current_playlist,
+                            audio_state.current_song
+                        );
+
+                        current_page =
+                            AUDIO_NOW_PLAYING;
+                    }
+                    break;
+                }
                 case 3:
                 {
                     if(current_playlist > 0)
