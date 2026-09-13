@@ -117,46 +117,9 @@ int main(int argc, char **argv)
     }
     else
     {
-        /*
-         * TEMPORARY TEST:
-         *
-         * Play the first MP3 in the library.
-         *
-         * We will remove this test once we know
-         * desktop playback works.
-         */
-        if(audio_library_get_count() > 0)
-        {
-            const char *path =
-                audio_library_get_path(0);
-
-
-            printf(
-                "\n"
-                "========================================\n"
-                "AUDIO PLAYBACK TEST\n"
-                "========================================\n"
-                "Song 0:\n"
-                "%s\n"
-                "========================================\n"
-                "\n",
-                path
-            );
-
-
-            if(audio_player_play(path) != 0)
-            {
-                printf(
-                    "Audio playback test failed.\n"
-                );
-            }
-        }
-        else
-        {
-            printf(
-                "No MP3 files found for playback test.\n"
-            );
-        }
+        printf(
+            "Audio player initialized successfully.\n"
+        );
     }
 
 

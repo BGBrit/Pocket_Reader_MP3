@@ -183,14 +183,14 @@ void home_open(void)
     {
         lv_label_set_text(
             audio_label,
-            "> AUDIO"
+            "> MUSIC"
         );
     }
     else
     {
         lv_label_set_text(
             audio_label,
-            "AUDIO"
+            "MUSIC"
         );
     }
 
@@ -215,7 +215,7 @@ static void home_update_selection(void)
 
         lv_label_set_text(
             audio_label,
-            "AUDIO"
+            "MUSIC"
         );
     }
     else
@@ -227,7 +227,7 @@ static void home_update_selection(void)
 
         lv_label_set_text(
             audio_label,
-            "> AUDIO"
+            "> MUSIC"
         );
     }
 }
