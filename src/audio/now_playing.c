@@ -1,6 +1,7 @@
 #include "now_playing.h"
 
 #include "audio_library.h"
+#include "audio_player.h"
 #include "playlist.h"
 #include "playlist_storage.h"
 #include "../assets/wallpaper_test.h"
@@ -13,9 +14,6 @@
 #include <time.h>
 
 #include "audio_state.h"
-
-
-#define SONG_DURATION_SECONDS 210
 
 /*
  * Add to Playlist popup
@@ -35,7 +33,7 @@ static int selected_add_to_playlist = 0;
  * Playback state
  */
 
-static int elapsed_seconds = 0;
+static double elapsed_seconds = 0.0;
 
 static lv_timer_t *progress_timer = NULL;
 
@@ -316,7 +314,7 @@ void now_playing_open(
     lv_bar_set_range(
         progress_bar,
         0,
-        SONG_DURATION_SECONDS
+        100
     );
 
 
@@ -425,6 +423,28 @@ void now_playing_open(
             "Playlist: %s",
             p->name
         );
+
+        int song_index =
+            p->song_indices[audio_state.current_song];
+
+        const char *path =
+            audio_library_get_path(song_index);
+
+        if(path)
+        {
+            if(audio_player_play(path) != 0)
+            {
+                printf(
+                    "Now Playing: failed to start audio.\n"
+                );
+
+                audio_state.playing = 0;
+            }
+            else
+            {
+                audio_state.playing = 1;
+            }
+        }
     }
 
 
@@ -526,18 +546,29 @@ static void update_mode_label(void)
 
 static void update_time_label(void)
 {
-    int current_minutes =
-        elapsed_seconds / 60;
+    double position =
+        audio_player_get_position();
 
-    int current_seconds =
-        elapsed_seconds % 60;
+    double duration =
+        audio_player_get_duration();
 
-    int total_minutes =
-        SONG_DURATION_SECONDS / 60;
+    int current_total_seconds =
+        (int)position;
 
     int total_seconds =
-        SONG_DURATION_SECONDS % 60;
+        (int)duration;
 
+    int current_minutes =
+        current_total_seconds / 60;
+
+    int current_seconds =
+        current_total_seconds % 60;
+
+    int total_minutes =
+        total_seconds / 60;
+
+    int remaining_seconds =
+        total_seconds % 60;
 
     lv_label_set_text_fmt(
         time_label,
@@ -545,20 +576,44 @@ static void update_time_label(void)
         current_minutes,
         current_seconds,
         total_minutes,
-        total_seconds
+        remaining_seconds
     );
 }
-
-
 /*
  * Update progress bar.
  */
 
 static void update_progress(void)
 {
+    double position =
+        audio_player_get_position();
+
+    double duration =
+        audio_player_get_duration();
+
+    if(duration <= 0.0)
+    {
+        lv_bar_set_value(
+            progress_bar,
+            0,
+            LV_ANIM_OFF
+        );
+
+        return;
+    }
+
+    int progress =
+        (int)((position / duration) * 100.0);
+
+    if(progress < 0)
+        progress = 0;
+
+    if(progress > 100)
+        progress = 100;
+
     lv_bar_set_value(
         progress_bar,
-        elapsed_seconds,
+        progress,
         LV_ANIM_OFF
     );
 }
@@ -683,9 +738,7 @@ static void advance_to_next_song(void)
 
                 audio_state.playing = 0;
 
-                elapsed_seconds =
-                    SONG_DURATION_SECONDS;
-
+                audio_player_stop();
                 now_playing_refresh();
 
                 return;
@@ -711,9 +764,35 @@ static void advance_to_next_song(void)
     }
 
 
-    elapsed_seconds = 0;
+    Playlist *next_playlist =
+        playlist_get(
+            audio_state.current_playlist
+        );
 
-    audio_state.playing = 1;
+    if(next_playlist &&
+    audio_state.current_song >= 0 &&
+    audio_state.current_song < next_playlist->song_count)
+    {
+        int song_index =
+            next_playlist->song_indices[
+                audio_state.current_song
+            ];
+
+        const char *path =
+            audio_library_get_path(song_index);
+
+        if(path)
+        {
+            if(audio_player_play(path) == 0)
+            {
+                audio_state.playing = 1;
+            }
+            else
+            {
+                audio_state.playing = 0;
+            }
+        }
+    }
 
     now_playing_refresh();
 }
@@ -729,37 +808,36 @@ static void progress_timer_callback(
 {
     LV_UNUSED(timer);
 
+    double position =
+        audio_player_get_position();
 
-    if(!audio_state.playing)
-        return;
+    double duration =
+        audio_player_get_duration();
 
+    /*
+     * Keep UI state synchronized with
+     * the real audio player.
+     */
+    audio_state.playing =
+        audio_player_is_playing();
 
-    elapsed_seconds++;
-
-
-    if(elapsed_seconds >=
-       SONG_DURATION_SECONDS)
+    /*
+     * Song has finished.
+     */
+    if(duration > 0.0 &&
+       position >= duration)
     {
-        /*
-         * Song has finished.
-         */
-
-        elapsed_seconds =
-            SONG_DURATION_SECONDS;
+        audio_state.playing = 0;
 
         advance_to_next_song();
 
         return;
     }
 
-
     update_progress();
-
     update_time_label();
-
     update_play_button();
 }
-
 
 /*
  * Update Now Playing options menu.
@@ -1624,8 +1702,19 @@ int now_playing_handle_key(
 
     if(key == ' ')
     {
-        audio_state.playing =
-            !audio_state.playing;
+        if(audio_state.playing)
+        {
+            audio_player_pause();
+
+            audio_state.playing = 0;
+        }
+        else
+        {
+            audio_player_resume();
+
+            audio_state.playing =
+                audio_player_is_playing();
+        }
 
         update_play_button();
 
@@ -1663,7 +1752,35 @@ int now_playing_handle_key(
                 }
             }
 
-            elapsed_seconds = 0;
+            Playlist *new_playlist =
+                playlist_get(
+                    audio_state.current_playlist
+                );
+
+            if(new_playlist &&
+            audio_state.current_song >= 0 &&
+            audio_state.current_song < new_playlist->song_count)
+            {
+                int song_index =
+                    new_playlist->song_indices[
+                        audio_state.current_song
+                    ];
+
+                const char *path =
+                    audio_library_get_path(song_index);
+
+                if(path)
+                {
+                    if(audio_player_play(path) == 0)
+                    {
+                        audio_state.playing = 1;
+                    }
+                    else
+                    {
+                        audio_state.playing = 0;
+                    }
+                }
+            }
 
             now_playing_refresh();
         }
@@ -1702,7 +1819,35 @@ int now_playing_handle_key(
                 }
             }
 
-            elapsed_seconds = 0;
+            Playlist *new_playlist =
+                playlist_get(
+                    audio_state.current_playlist
+                );
+
+            if(new_playlist &&
+            audio_state.current_song >= 0 &&
+            audio_state.current_song < new_playlist->song_count)
+            {
+                int song_index =
+                    new_playlist->song_indices[
+                        audio_state.current_song
+                    ];
+
+                const char *path =
+                    audio_library_get_path(song_index);
+
+                if(path)
+                {
+                    if(audio_player_play(path) == 0)
+                    {
+                        audio_state.playing = 1;
+                    }
+                    else
+                    {
+                        audio_state.playing = 0;
+                    }
+                }
+            }
 
             now_playing_refresh();
         }

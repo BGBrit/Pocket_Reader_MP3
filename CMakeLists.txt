@@ -73,8 +73,11 @@ set(MAIN_SOURCES src/hal/hal.c src/my_custom_ui.c
 src/ereader_engine.c src/bookshelf/bookshelf.c
 src/home/home.c src/reader_view.c src/assets/wallpaper_test.c
 src/audio/audio.c src/common/scroll_list.c src/audio/playlist.c
-src/audio/audio_library.c src/audio/playlist_storage.c src/common/text_entry.c src/audio/now_playing.c
-src/audio/audio_state.c)
+src/audio/audio_library.c src/audio/playlist_storage.c
+src/common/text_entry.c
+src/audio/now_playing.c
+src/audio/audio_state.c
+src/audio/audio_player.c)
 set(MAIN_LIBS lvgl lvgl::examples lvgl::demos lvgl::thorvg ${SDL2_LIBRARIES})
 
 # Create the main executable, depending on the FreeRTOS option
@@ -147,8 +150,23 @@ if(LVGL_PRO_PROJECT_DIR)
 endif()
 
 add_executable(main ${MAIN_SOURCES})
-target_compile_definitions(main PRIVATE LV_CONF_INCLUDE_SIMPLE)
-target_link_libraries(main ${MAIN_LIBS})
+
+target_compile_definitions(
+    main
+    PRIVATE
+    LV_CONF_INCLUDE_SIMPLE
+)
+
+target_include_directories(
+    main
+    PRIVATE
+    ${SDL2_INCLUDE_DIRS}
+)
+
+target_link_libraries(
+    main
+    ${MAIN_LIBS}
+)
 
 # On Windows, GUI applications do not show a console by default,
 # which hides log output. This ensures a console is available for logging.
