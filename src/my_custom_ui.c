@@ -906,6 +906,7 @@ void init_pocket_reader_ui(void)
     button_group = lv_group_get_default();
 
     create_key_receiver();
+    load_passcode_from_disk();
 
     open_home();
 
